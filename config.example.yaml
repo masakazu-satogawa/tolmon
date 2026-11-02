@@ -1,0 +1,27 @@
+# トルモンの設定（見本）。
+# 本番ではこのファイルを config.yaml という名前でコピーして値を変える。
+# config.yaml があればそちらが優先される（config.yaml はリポジトリに入れない）。
+# パスはこのフォルダからの相対パスで書く。
+
+server:
+  # 127.0.0.1 = このPCの中だけ。院内のiPadから使うときは "0.0.0.0" にする
+  host: "127.0.0.1"
+  port: 8080
+
+paths:
+  # 問診定義を読むフォルダ（上から順に読む）
+  definitions:
+    - "definitions"
+    - "definitions_local"
+  # 回答を保存するフォルダ
+  data: "data"
+
+patient:
+  # 患者画面で操作がないとき、この秒数で「続けますか？」を出す
+  idle_seconds: 180
+  # 「続けますか？」に答えないとき、この秒数で受付画面に戻す
+  idle_grace_seconds: 20
+  # 送信後の「お大事に」画面を出しておく秒数
+  thanks_seconds: 10
+  # 患者IDの形（正規表現）。数字1〜10桁
+  pcode_pattern: "^[0-9]{1,10}$"

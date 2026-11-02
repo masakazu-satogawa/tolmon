@@ -1,0 +1,13 @@
+# 秘密・院内固有
+.env
+config.yaml
+
+# 実在帳票から作った定義（非公開）
+definitions_local/
+
+# 回答データ
+data/
+
+# Python
+__pycache__/
+*.pyc

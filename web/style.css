@@ -1,0 +1,126 @@
+/* トルモン共通スタイル：高齢の方でも読みやすい大きさとコントラスト */
+:root {
+  --bg: #f6f7f5;
+  --card: #ffffff;
+  --ink: #1d2422;
+  --muted: #5a6662;
+  --line: #d5dbd8;
+  --accent: #0f6b5c;
+  --accent-ink: #ffffff;
+  --accent-soft: #e3f1ee;
+  --warn: #b3261e;
+  --warn-soft: #fbeceb;
+  --radius: 14px;
+  font-size: 22px;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); }
+body {
+  font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", sans-serif;
+  line-height: 1.6;
+  -webkit-text-size-adjust: 100%;
+  touch-action: manipulation;
+}
+button, input, textarea, select { font: inherit; color: inherit; }
+[hidden] { display: none !important; }
+
+#app { max-width: 900px; margin: 0 auto; padding: 24px 24px 40px; min-height: 100vh; position: relative; }
+.screen { display: flex; flex-direction: column; gap: 20px; min-height: calc(100vh - 64px); }
+.center { margin: auto; text-align: center; display: flex; flex-direction: column; gap: 12px; align-items: center; }
+
+h1, h2 { margin: 0; line-height: 1.4; }
+.lead { font-size: 1.5rem; font-weight: 700; margin: 0; }
+.sub { color: var(--muted); margin: 0; }
+.hint { color: var(--muted); margin: -8px 0 0; }
+.warn { color: var(--warn); background: var(--warn-soft); padding: 10px 14px; border-radius: 10px; margin: 0; font-weight: 700; white-space: pre-line; }
+
+/* ボタン */
+.btn {
+  min-height: 72px; padding: 12px 28px; border-radius: var(--radius);
+  border: 2px solid var(--line); background: var(--card); cursor: pointer; font-weight: 700;
+}
+.btn:disabled { opacity: .4; cursor: default; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.danger { background: var(--warn); border-color: var(--warn); color: #fff; }
+.btn.wide { width: 100%; }
+.btn.huge { font-size: 1.4rem; min-height: 96px; min-width: 320px; margin-top: 24px; }
+
+/* 受付 */
+.staff-head { display: flex; align-items: center; gap: 12px; }
+.badge { background: var(--ink); color: #fff; font-size: .75rem; padding: 4px 10px; border-radius: 999px; }
+.step { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+.step h2 { font-size: 1.05rem; display: flex; align-items: center; gap: 10px; }
+.num { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: #fff; font-size: .9rem; }
+.form-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.pcode-input {
+  font-size: 2rem; letter-spacing: .15em; padding: 12px 16px; border: 2px solid var(--line);
+  border-radius: var(--radius); width: 100%; background: #fff;
+}
+.pcode-input:focus { outline: 3px solid var(--accent); border-color: var(--accent); }
+
+/* 選択肢（受付の問診票選択と共通） */
+.choice {
+  display: flex; align-items: center; gap: 16px; width: 100%; text-align: left;
+  min-height: 76px; padding: 14px 20px; border-radius: var(--radius);
+  border: 2px solid var(--line); background: var(--card); cursor: pointer; font-weight: 700;
+}
+.choice .mark {
+  flex: none; width: 36px; height: 36px; border: 3px solid var(--line); border-radius: 50%;
+  display: grid; place-items: center; font-size: 1.1rem; color: transparent;
+}
+.choice.multi .mark { border-radius: 8px; }
+.choice[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.choice[aria-pressed="true"] .mark { border-color: var(--accent); background: var(--accent); color: #fff; }
+.choice .small { display: block; font-weight: 400; color: var(--muted); font-size: .8rem; }
+
+/* 設問 */
+.progress { height: 10px; background: var(--line); border-radius: 999px; overflow: hidden; }
+#progress-bar { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+.progress-text { margin: -10px 0 0; color: var(--muted); font-size: .9rem; }
+.q-text { font-size: 1.5rem; }
+.q-body { display: flex; flex-direction: column; gap: 12px; }
+.detail { margin: -4px 0 4px 52px; display: flex; flex-direction: column; gap: 6px; }
+.detail label { color: var(--muted); font-size: .9rem; }
+textarea, .q-input {
+  width: 100%; border: 2px solid var(--line); border-radius: var(--radius); padding: 14px 16px; background: #fff;
+}
+textarea { min-height: 140px; resize: vertical; }
+textarea:focus, .q-input:focus { outline: 3px solid var(--accent); border-color: var(--accent); }
+.number-row { display: flex; align-items: center; gap: 14px; }
+.number-row .q-input { font-size: 2rem; max-width: 260px; text-align: right; }
+.unit { font-size: 1.4rem; font-weight: 700; }
+
+.nav { margin-top: auto; display: flex; gap: 16px; padding-top: 12px; }
+.nav .btn { flex: 1; }
+.nav .btn.primary { flex: 2; }
+
+/* 確認 */
+.review-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.review-list li { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 18px; display: flex; gap: 16px; align-items: center; }
+.review-list .rq { color: var(--muted); font-size: .85rem; }
+.review-list .ra { font-weight: 700; }
+.review-list .ra.empty { color: var(--muted); font-weight: 400; }
+.review-list .grow { flex: 1; }
+.review-list .btn { min-height: 56px; padding: 8px 18px; }
+
+.big-check { font-size: 5rem; color: var(--accent); margin: 0; line-height: 1; }
+
+/* 中止ボタン（職員用・目立たせない） */
+.abort { position: fixed; top: 10px; right: 12px; background: transparent; border: 1px solid var(--line); color: var(--muted); border-radius: 999px; padding: 6px 14px; font-size: .7rem; }
+
+/* ダイアログ */
+.overlay { position: fixed; inset: 0; background: rgba(20, 28, 26, .55); display: grid; place-items: center; padding: 20px; z-index: 10; }
+.dialog { background: var(--card); border-radius: 20px; padding: 28px; width: min(620px, 100%); display: flex; flex-direction: column; gap: 10px; }
+.dlg-title { font-size: 1.25rem; font-weight: 700; margin: 0 0 6px; }
+.dlg-label { margin: 6px 0 0; color: var(--muted); font-size: .85rem; }
+.confirm-pcode { font-size: 3rem; font-weight: 700; letter-spacing: .12em; margin: 0; font-variant-numeric: tabular-nums; }
+.confirm-form { font-size: 1.2rem; font-weight: 700; margin: 0; }
+.dlg-actions { display: flex; gap: 14px; margin-top: 16px; }
+.dlg-actions .btn { flex: 1; }
+
+@media (max-width: 600px) {
+  :root { font-size: 19px; }
+  #app { padding: 16px 16px 32px; }
+  .detail { margin-left: 0; }
+}
