@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>問診結果 | トルモン</title>
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/doctor.css">
+</head>
+<body class="doctor">
+<header class="d-head">
+  <h1>問診結果</h1>
+  <div class="d-filters">
+    <label>日付 <input id="f-date" type="date"></label>
+    <label>患者ID <input id="f-pcode" inputmode="numeric" autocomplete="off" placeholder="すべて"></label>
+    <button id="btn-refresh" class="d-btn" type="button">更新</button>
+  </div>
+</header>
+
+<div class="d-body">
+  <aside class="d-list-wrap">
+    <p id="list-count" class="d-count"></p>
+    <ul id="d-list" class="d-list"></ul>
+  </aside>
+
+  <section id="d-detail" class="d-detail">
+    <p class="d-empty">左の一覧から選んでください</p>
+  </section>
+</div>
+
+<p class="d-note">電子カルテ連携を模したデモ画面です。診断・判断は行いません（判断は医師が行います）。</p>
+
+<div id="toast" class="toast" hidden></div>
+<script src="/static/doctor.js"></script>
+</body>
+</html>
