@@ -25,8 +25,8 @@ body {
 button, input, textarea, select { font: inherit; color: inherit; }
 [hidden] { display: none !important; }
 
-#app { max-width: 900px; margin: 0 auto; padding: 24px 24px 40px; min-height: 100vh; position: relative; }
-.screen { display: flex; flex-direction: column; gap: 20px; min-height: calc(100vh - 64px); }
+#app { max-width: 900px; margin: 0 auto; padding: 52px 24px 40px; min-height: 100vh; position: relative; }
+.screen { display: flex; flex-direction: column; gap: 20px; min-height: calc(100vh - 92px); }
 .center { margin: auto; text-align: center; display: flex; flex-direction: column; gap: 12px; align-items: center; }
 
 h1, h2 { margin: 0; line-height: 1.4; }
