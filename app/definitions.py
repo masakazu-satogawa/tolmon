@@ -3,9 +3,9 @@
 import hashlib
 import os
 
-from . import yamlmini
+from . import body, yamlmini
 
-TYPES = ("text", "single", "multi", "number", "time")
+TYPES = ("text", "single", "multi", "number", "time", "body")
 TAGS = ("基本情報", "主訴", "現病歴", "既往歴", "内服薬", "アレルギー", "生活歴", "その他")
 COND_OPS = ("eq", "ne", "lt", "gte")
 CHOICE_TYPES = ("single", "multi")
@@ -86,6 +86,10 @@ def validate(d):
                     labels.append(o["label"])
                 if len(set(labels)) != len(labels):
                     errs.append(f"{where}: 同じ選択肢が重複しています")
+        if t == "body" and q.get("views") is not None:
+            views = q["views"]
+            if not isinstance(views, list) or not views or any(v not in body.VIEWS for v in views):
+                errs.append(f"{where}: views は {' / '.join(body.VIEWS)} の中から並べてください")
         cond = q.get("show_if")
         if cond is not None:
             errs.extend(f"{where}: {e}" for e in _check_cond(cond, seen))

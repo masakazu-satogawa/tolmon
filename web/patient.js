@@ -27,6 +27,9 @@ var S = {
   form: null,        // 選んだ問診定義
   answers: {},       // { qid: { value, details: { label: text } } }
   current: null,     // 表示中の設問id
+  sub: null,         // "main" = 人体シェーマの「いちばんつらいところ」を選ぶ画面
+  bodyView: {},      // { qid: 表示中の図（front/back/…） }
+  bodyLabels: {},    // 部位id → 表示名（サーバーから）
   fromReview: false,
   startedAt: null,
   pending: null,     // 送信後の { record_id, number }
@@ -93,6 +96,9 @@ function patientMode() { return PATIENT_SCREENS.indexOf(S.screen) >= 0; }
 function initReception() {
   return api("/api/config").then(function (cfg) {
     S.cfg = cfg;
+    return api("/api/body");
+  }).then(function (b) {
+    S.bodyLabels = b.regions;
     return api("/api/forms");
   }).then(function (data) {
     S.forms = data.forms;
@@ -157,6 +163,7 @@ $("btn-begin").addEventListener("click", function () { goTo(visibleQuestions()[0
 
 function goTo(qid) {
   S.current = qid;
+  S.sub = null;
   renderQuestion();
   show("question");
 }
@@ -173,8 +180,15 @@ function renderQuestion() {
   $("q-msg").hidden = true;
   var body = $("q-body");
   clear(body);
+  body.className = "q-body" + (q.type === "body" && S.sub !== "main" ? " is-body" : "");
   var a = S.answers[q.id] || {};
+  $("btn-back").textContent = S.fromReview ? "確認画面へ" : "もどる";
 
+  if (q.type === "body") {
+    if (S.sub === "main") renderBodyMain(q, a, body);
+    else renderBody(q, a, body);
+    return;
+  }
   if (q.type === "single" || q.type === "multi") {
     var multi = q.type === "multi";
     var chosen = multi ? (a.value || []) : (a.value ? [a.value] : []);
@@ -218,7 +232,59 @@ function renderQuestion() {
     body.appendChild(ta2);
   }
   updateNext(q);
-  $("btn-back").textContent = S.fromReview ? "確認画面へ" : "もどる";
+}
+
+// ---------------------------------------------------------------- 人体シェーマ
+function bodyLabel(id) { return S.bodyLabels[id] || id; }
+
+function renderBody(q, a, body) {
+  var views = TolmonBody.views.filter(function (v) { return !q.views || q.views.indexOf(v.id) >= 0; });
+  var current = S.bodyView[q.id] || views[0].id;
+  var tabs = el("div", { "class": "body-tabs" });
+  views.forEach(function (v) {
+    var b = el("button", { "class": "body-tab", type: "button", "aria-pressed": String(v.id === current) }, v.label);
+    b.addEventListener("click", function () { S.bodyView[q.id] = v.id; renderQuestion(); });
+    tabs.appendChild(b);
+  });
+  var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "body-svg");
+  var selected = {};
+  (a.value || []).forEach(function (id) { selected[id] = true; });
+  TolmonBody.draw(current, svg, selected, S.bodyLabels, function (id) { toggleBody(q, id); });
+  var picked = a.value || [];
+  var list = el("p", { "class": "body-selected" + (picked.length ? "" : " empty") },
+    picked.length ? "選んだところ：" + picked.map(bodyLabel).join("、") : "図をタップして選んでください");
+  body.appendChild(tabs);
+  body.appendChild(svg);
+  body.appendChild(list);
+  updateNext(q);
+}
+
+function toggleBody(q, id) {
+  var a = S.answers[q.id] || { value: [] };
+  var v = a.value || [];
+  var i = v.indexOf(id);
+  if (i >= 0) v.splice(i, 1); else v.push(id);
+  if (a.main && v.indexOf(a.main) < 0) delete a.main;
+  if (!v.length) delete S.answers[q.id];
+  else { a.value = v; S.answers[q.id] = a; }
+  renderQuestion();
+}
+
+// 2か所以上選んだときだけ：「いちばんつらいところ」を1つ選ぶ（紙の問診票の意図＝主訴を知る）
+function renderBodyMain(q, a, body) {
+  $("q-text").textContent = "いちばんつらいのは、どこですか？";
+  $("q-hint").hidden = false;
+  $("q-hint").textContent = "選んだところの中から、1つ選んでください";
+  (a.value || []).forEach(function (id) {
+    var btn = el("button", { "class": "choice", type: "button", "aria-pressed": String(a.main === id) },
+      el("span", { "class": "mark" }, "✓"), el("span", {}, bodyLabel(id)));
+    btn.addEventListener("click", function () { a.main = id; renderQuestion(); });
+    body.appendChild(btn);
+  });
+  $("btn-next").disabled = !a.main;
+  $("btn-next").textContent = "次へ";
+  $("btn-back").textContent = "図にもどる";
 }
 
 function setValue(q, v) {
@@ -271,6 +337,16 @@ $("btn-next").addEventListener("click", function () {
     $("q-msg").hidden = false;
     return;
   }
+  // 人体シェーマで2か所以上 → 先に「いちばんつらいところ」を選ぶ
+  if (q.type === "body" && S.sub !== "main") {
+    var picked = (S.answers[q.id] || {}).value || [];
+    if (picked.length >= 2) {
+      S.sub = "main";
+      renderQuestion();
+      return;
+    }
+  }
+  S.sub = null;
   var qs = visibleQuestions();
   var i = indexOfId(qs, q.id);
   // 確認画面から直しに来たときは、新しく出てきた設問がなければ確認画面へ戻る
@@ -285,6 +361,11 @@ $("btn-next").addEventListener("click", function () {
 });
 
 $("btn-back").addEventListener("click", function () {
+  if (S.sub === "main") {
+    S.sub = null;
+    renderQuestion();
+    return;
+  }
   if (S.fromReview) {
     S.fromReview = false;
     return openReview();
@@ -299,6 +380,10 @@ $("btn-back").addEventListener("click", function () {
 function answerText(q) {
   if (!hasAnswer(q)) return null;
   var a = S.answers[q.id];
+  if (q.type === "body") {
+    var many = a.value.length >= 2;
+    return a.value.map(function (id) { return bodyLabel(id) + (many && id === a.main ? "（いちばんつらい）" : ""); }).join("、");
+  }
   if (q.type === "single" || q.type === "multi") {
     var labels = Array.isArray(a.value) ? a.value : [a.value];
     return labels.map(function (l) {

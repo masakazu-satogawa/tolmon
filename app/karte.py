@@ -1,6 +1,9 @@
 """回答をカルテ貼り付け用の文章と、開示用の「設問と回答」に整える（AIは使わない）。"""
 
+from . import body
 from .definitions import TAGS
+
+MAIN_SUFFIX = "（いちばんつらい）"
 
 
 def _num(v):
@@ -62,11 +65,24 @@ def karte_value(q, a):
             d = (details.get(label) or "").strip()
             parts.append(f"{s}（{d}）" if d else s)
         return "、".join(parts)
+    if t == "body":
+        return "、".join(body.label(x) for x in v) if isinstance(v, list) and v else None
     if v is None or str(v).strip() == "":
         return None
     if t == "number":
         return f"{v}{q.get('unit', '')}"
     return str(v).strip()
+
+
+def body_main(q, a):
+    """人体シェーマで「いちばんつらいところ」があればその部位名（1か所だけならその部位）。"""
+    if not a or q["type"] != "body":
+        return None
+    v = a.get("value") or []
+    main = a.get("main")
+    if main in v:
+        return body.label(main)
+    return body.label(v[0]) if len(v) == 1 else None
 
 
 def patient_value(q, a):
@@ -75,6 +91,11 @@ def patient_value(q, a):
         return "（未回答）"
     v = a.get("value")
     details = a.get("details") or {}
+    if q["type"] == "body":
+        if not v:
+            return "（未回答）"
+        main = a.get("main") if len(v) >= 2 else None
+        return "、".join(body.label(x) + (MAIN_SUFFIX if x == main else "") for x in v)
     if q["type"] in ("single", "multi"):
         labels = v if isinstance(v, list) else ([v] if v else [])
         if not labels:
@@ -102,6 +123,12 @@ def karte_text(defn, answers, when):
             continue
         tag = q.get("tag", "その他")
         label = q["karte"]
+        if q["type"] == "body":
+            # いちばんつらい部位は主訴として先頭に。部位の一覧は設問のタグの行に残す
+            main = body_main(q, answers.get(q["id"]))
+            if main:
+                many = len(answers[q["id"]].get("value") or []) >= 2
+                groups["主訴"].insert(0, main + (MAIN_SUFFIX if many else ""))
         groups[tag].append(val if label == tag else f"{label}：{val}")
     lines = [f"【問診】{defn['title']}　{when}"]
     for tag in TAGS:

@@ -9,7 +9,7 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-from . import definitions, store
+from . import body, definitions, store
 
 MAX_BODY = 1 * 1024 * 1024  # 回答の送信は1MBまで
 
@@ -113,6 +113,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._static(path[len("/static/"):])
         if path == "/api/config":
             return self._json(app.client_config)
+        if path == "/api/body":
+            return self._json({"regions": body.REGIONS, "views": list(body.VIEWS)})
         if path == "/api/forms":
             forms = [{"id": d["id"], "title": d["title"], "version": d.get("version"), "count": len(d["questions"])}
                      for d in app.defs.values()]

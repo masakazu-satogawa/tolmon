@@ -13,7 +13,7 @@ import sqlite3
 import threading
 from datetime import datetime
 
-from . import karte
+from . import body, karte
 
 _lock = threading.Lock()
 
@@ -81,6 +81,18 @@ def clean_answers(defn, raw):
         details = a.get("details") if isinstance(a.get("details"), dict) else {}
         t = q["type"]
         labels = [o["label"] for o in q.get("options") or []]
+        if t == "body":
+            # 部位の id の一覧。2か所以上なら「いちばんつらいところ」(main) も受け取る
+            v = v if isinstance(v, list) else []
+            if any(x not in body.REGIONS for x in v):
+                raise AnswerError(f"「{q['text']}」の部位が正しくありません")
+            v = list(dict.fromkeys(v))
+            if q.get("required") and not v:
+                raise AnswerError(f"「{q['text']}」は必ず答えてください")
+            if v:
+                main = a.get("main") if a.get("main") in v else (v[0] if len(v) == 1 else None)
+                answers[q["id"]] = {"value": v, "main": main} if main else {"value": v}
+            continue
         if t == "single":
             if v not in (None, "") and v not in labels:
                 raise AnswerError(f"「{q['text']}」の選択肢が正しくありません")

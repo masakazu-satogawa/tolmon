@@ -123,6 +123,25 @@ textarea:focus, .q-input:focus { outline: 3px solid var(--accent); border-color:
 .number-row .q-input { font-size: 2rem; max-width: 260px; text-align: right; }
 .unit { font-size: 1.4rem; font-weight: 700; }
 
+/* 人体シェーマ */
+.body-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.body-tab {
+  min-height: 52px; padding: 6px 18px; border-radius: 999px; border: 2px solid var(--line);
+  background: var(--card); font-weight: 700; cursor: pointer;
+}
+.body-tab[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.body-svg { width: 100%; height: auto; max-height: calc(var(--vh) * 54); display: block; }
+.body-tabs ~ .body-svg { margin: -4px 0; }
+/* 図の設問は見出しと図の間を詰め、図をできるだけ大きく */
+.q-body.is-body { gap: 8px; }
+.body-svg .part { fill: #fff; stroke: #6b7773; stroke-width: 1.5; cursor: pointer; }
+.body-svg .part.on { fill: var(--accent); stroke: var(--accent); }
+.body-svg .outline { fill: none; stroke: var(--line); stroke-width: 1.5; }
+.body-svg .label { fill: var(--muted); font-size: 11px; font-family: inherit; }
+.body-svg .label.cap { font-size: 12px; font-weight: 700; fill: var(--ink); }
+.body-selected { margin: 0; font-weight: 700; }
+.body-selected.empty { color: var(--muted); font-weight: 400; }
+
 .nav { margin-top: auto; display: flex; gap: 16px; padding-top: 12px; }
 .nav .btn { flex: 1; }
 .nav .btn.primary { flex: 2; }
