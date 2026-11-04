@@ -4,6 +4,24 @@ id: "sample_naika"
 title: "内科 初診問診票（サンプル）"
 version: 1
 questions:
+  - id: "sex"
+    type: "single"
+    text: "性別を教えてください"
+    karte: "性別"
+    tag: "基本情報"
+    options:
+      - label: "男性"
+        karte: "男性"
+      - label: "女性"
+        karte: "女性"
+  - id: "age"
+    type: "number"
+    text: "年齢を教えてください"
+    karte: "年齢"
+    tag: "基本情報"
+    unit: "歳"
+    min: 0
+    max: 120
   - id: "temp"
     type: "number"
     text: "今の体温を教えてください"
@@ -118,6 +136,13 @@ questions:
     text: "現在、妊娠中または授乳中ですか？"
     karte: "妊娠・授乳"
     tag: "その他"
+    # 男性・50歳以上には出さない（答えていなければ出す）
+    show_if:
+      all:
+        - q: "sex"
+          ne: "男性"
+        - q: "age"
+          lt: 50
     options:
       - label: "妊娠中"
         karte: "妊娠中"

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>受付待ち | トルモン</title>
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/doctor.css">
+</head>
+<body class="doctor">
+<header class="d-head">
+  <h1>受付待ちの問診（患者ID未登録）</h1>
+  <div class="d-filters">
+    <label>日付 <input id="f-date" type="date"></label>
+    <button id="btn-refresh" class="d-btn" type="button">更新</button>
+  </div>
+</header>
+
+<div class="r-body">
+  <p class="sub">患者さんがタブレットで送ったあと、まだ患者IDが結ばれていない回答です。タブレット側で登録できなかったときは、ここから登録してください。</p>
+  <p id="list-count" class="d-count"></p>
+  <table class="r-table">
+    <thead><tr><th>受付番号</th><th>送信時刻</th><th>問診票</th><th>患者ID</th><th></th></tr></thead>
+    <tbody id="r-list"></tbody>
+  </table>
+</div>
+
+<div id="dlg-confirm" class="overlay" hidden>
+  <div class="dialog">
+    <p class="dlg-title">この内容で登録します</p>
+    <div class="confirm-grid">
+      <div><p class="dlg-label">受付番号</p><p id="confirm-number" class="confirm-number"></p></div>
+      <div><p class="dlg-label">患者ID</p><p id="confirm-pcode" class="confirm-pcode"></p></div>
+    </div>
+    <p id="confirm-form" class="confirm-form"></p>
+    <p id="confirm-msg" class="warn" hidden></p>
+    <div class="dlg-actions">
+      <button id="btn-confirm-no" class="btn" type="button">やめる</button>
+      <button id="btn-confirm-yes" class="btn primary" type="button">まちがいない・登録</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+<script src="/static/reception.js"></script>
+</body>
+</html>

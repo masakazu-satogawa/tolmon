@@ -3,15 +3,38 @@
 from .definitions import TAGS
 
 
+def _num(v):
+    try:
+        return float(str(v).replace(",", "."))
+    except (TypeError, ValueError):
+        return None
+
+
+def check_condition(cond, answers):
+    """show_if の1条件。考え方：「答えていない」ときは聞く側に倒す（eq と gte だけは答えが必要）。
+      eq: 選んだ（含む）  ne: 選んでいない  lt: 数値が未満  gte: 数値が以上
+    web/patient.js の checkCondition と同じ動きにすること。
+    """
+    if "all" in cond:
+        return all(check_condition(c, answers) for c in cond["all"])
+    ref = answers.get(cond["q"]) or {}
+    v = ref.get("value")
+    answered = v not in (None, "", [])
+    if "eq" in cond:
+        return answered and (v == cond["eq"] or (isinstance(v, list) and cond["eq"] in v))
+    if "ne" in cond:
+        return not answered or not (v == cond["ne"] or (isinstance(v, list) and cond["ne"] in v))
+    n = _num(v) if answered else None
+    if "lt" in cond:
+        return n is None or n < cond["lt"]
+    if "gte" in cond:
+        return n is not None and n >= cond["gte"]
+    return True
+
+
 def is_visible(q, answers):
     cond = q.get("show_if")
-    if not cond:
-        return True
-    ref = answers.get(cond["q"])
-    if not ref:
-        return False
-    v = ref.get("value")
-    return v == cond["eq"] or (isinstance(v, list) and cond["eq"] in v)
+    return True if not cond else check_condition(cond, answers)
 
 
 def _option(q, label):

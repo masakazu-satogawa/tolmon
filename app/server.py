@@ -13,7 +13,8 @@ from . import definitions, store
 
 MAX_BODY = 1 * 1024 * 1024  # 回答の送信は1MBまで
 
-PAGES = {"/": "index.html", "/doctor": "doctor.html"}
+# /karte は電子カルテの【問診】アイコンから患者IDつきで開く画面（中身は医師画面と同じ）
+PAGES = {"/": "index.html", "/doctor": "doctor.html", "/karte": "doctor.html", "/reception": "reception.html"}
 
 CONTENT_TYPES = {
     ".html": "text/html; charset=utf-8",
@@ -44,6 +45,7 @@ class App:
             "pcode_pattern": self.pcode_re.pattern,
         }
         self._lock = threading.Lock()
+        store.init_db(self.data_dir)
         self.reload()
 
     def reload(self):
@@ -121,8 +123,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self._error(404, "問診票がありません")
             return self._json({k: v for k, v in d.items() if k != "_file"})
         if path == "/api/answers":
-            rows = store.list_records(app.data_dir, date=qs.get("date"), pcode=qs.get("pcode"))
+            rows = store.list_registered(app.data_dir, day=qs.get("date"), pcode=qs.get("pcode"))
             return self._json({"records": rows})
+        if path == "/api/pending":
+            day = qs.get("date") or datetime.now().strftime("%Y-%m-%d")
+            return self._json({"records": store.list_pending(app.data_dir, day)})
         if path.startswith("/api/answers/"):
             rec = store.load_record(app.data_dir, path[len("/api/answers/"):])
             if not rec:
@@ -140,21 +145,30 @@ class Handler(BaseHTTPRequestHandler):
             return self._error(400, "送信データが読めません")
 
         if path == "/api/answers":
+            # 患者さんの送信：患者IDなしの「受付待ち」で保存し、受付番号を返す
             d = app.defs.get(body.get("form_id"))
             if not d:
                 return self._error(400, "問診票が見つかりません（受付でやり直してください）")
-            pcode = str(body.get("pcode", "")).strip()
-            if not app.pcode_re.match(pcode):
-                return self._error(400, "患者IDの形が正しくありません")
             if body.get("form_hash") and body["form_hash"] != d.get("_hash"):
                 return self._error(409, "問診票が更新されました。受付でやり直してください")
             meta = {"started_at": body.get("started_at"),
                     "client": {"ip": self.client_address[0], "ua": self.headers.get("User-Agent", "")[:200]}}
             try:
-                rec = store.save(app.data_dir, d, pcode, body.get("answers"), meta)
+                rec = store.save_pending(app.data_dir, d, body.get("answers"), meta)
             except store.AnswerError as e:
                 return self._error(400, str(e))
-            return self._json({"ok": True, "record_id": rec["record_id"]})
+            return self._json({"ok": True, **rec})
+        if path.startswith("/api/answers/") and path.endswith("/register"):
+            # 受付の操作：受付番号の回答に患者IDを結ぶ
+            record_id = path[len("/api/answers/"):-len("/register")]
+            pcode = str(body.get("pcode", "")).strip()
+            if not app.pcode_re.match(pcode):
+                return self._error(400, "患者IDの形が正しくありません")
+            try:
+                rec = store.register(app.data_dir, record_id, pcode)
+            except store.AnswerError as e:
+                return self._error(400, str(e))
+            return self._json({"ok": True, **rec})
         if path == "/api/reload":
             defs, errors = app.reload()
             return self._json({"ok": not errors, "forms": list(defs), "errors": errors})
@@ -171,7 +185,9 @@ def serve(root, config):
     shown = "localhost" if host in ("127.0.0.1", "0.0.0.0") else host
     print("トルモン 起動しました（止めるときは Ctrl+C）")
     print(f"  受付・患者画面: http://{shown}:{port}/")
-    print(f"  医師画面　　　: http://{shown}:{port}/doctor")
+    print(f"  受付待ち一覧　: http://{shown}:{port}/reception")
+    print(f"  医師・看護師　: http://{shown}:{port}/karte?pcode=患者ID（電子カルテの【問診】から）")
+    print(f"  問診一覧　　　: http://{shown}:{port}/doctor")
     print(f"  問診票: {', '.join(d['title'] for d in app.defs.values()) or '（なし）'}")
     try:
         httpd.serve_forever()

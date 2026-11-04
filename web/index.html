@@ -1,32 +1,36 @@
 <!doctype html>
-<html lang="ja">
+<html lang="ja" class="fs-m">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <title>問診 | トルモン</title>
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+
+<!-- 患者さんが答えている間だけ出る上の帯：文字の大きさ・職員用の中止 -->
+<div id="topbar" class="topbar" hidden>
+  <div class="fs-switch" role="group" aria-label="文字の大きさ">
+    <span class="fs-label">文字の大きさ</span>
+    <button type="button" data-fs="s">小</button>
+    <button type="button" data-fs="m">中</button>
+    <button type="button" data-fs="l">大</button>
+  </div>
+  <button id="btn-abort" class="abort" type="button">最初に戻る</button>
+</div>
+
 <main id="app">
 
-  <!-- 受付（職員が操作） -->
+  <!-- 受付：診療科を選んで渡す -->
   <section id="s-reception" class="screen">
     <header class="staff-head">
       <span class="badge">受付用</span>
-      <h1>問診をはじめる</h1>
+      <h1>診療科を選んで、タブレットをお渡しください</h1>
     </header>
-    <div class="step">
-      <h2><span class="num">1</span>問診票を選ぶ</h2>
-      <div id="form-list" class="form-list"></div>
-      <p id="form-errors" class="warn" hidden></p>
-    </div>
-    <div class="step">
-      <h2><span class="num">2</span>患者IDを入力</h2>
-      <input id="pcode" class="pcode-input" inputmode="numeric" autocomplete="off" placeholder="患者ID" aria-label="患者ID">
-      <p id="pcode-msg" class="warn" hidden></p>
-    </div>
-    <button id="btn-start" class="btn primary wide" disabled>確認へ進む</button>
+    <div id="form-list" class="form-list"></div>
+    <p id="form-errors" class="warn" hidden></p>
   </section>
 
   <!-- 患者向けのはじめの画面 -->
@@ -35,7 +39,8 @@
       <p class="lead">これから、いくつか質問をします。</p>
       <p class="lead">わかる範囲でお答えください。</p>
       <p class="sub" id="welcome-count"></p>
-      <button id="btn-begin" class="btn primary huge">はじめる</button>
+      <p class="sub">文字が読みにくいときは、上の「大」を押してください。</p>
+      <button id="btn-begin" class="btn primary huge" type="button">はじめる</button>
     </div>
   </section>
 
@@ -48,8 +53,8 @@
     <div id="q-body" class="q-body"></div>
     <p id="q-msg" class="warn" hidden></p>
     <footer class="nav">
-      <button id="btn-back" class="btn">もどる</button>
-      <button id="btn-next" class="btn primary">次へ</button>
+      <button id="btn-back" class="btn" type="button">もどる</button>
+      <button id="btn-next" class="btn primary" type="button">次へ</button>
     </footer>
   </section>
 
@@ -59,35 +64,64 @@
     <ol id="review-list" class="review-list"></ol>
     <p id="submit-msg" class="warn" hidden></p>
     <footer class="nav">
-      <button id="btn-review-back" class="btn">もどる</button>
-      <button id="btn-submit" class="btn primary">この内容で送る</button>
+      <button id="btn-review-back" class="btn" type="button">もどる</button>
+      <button id="btn-submit" class="btn primary" type="button">この内容で送る</button>
     </footer>
   </section>
 
-  <!-- 送信後 -->
-  <section id="s-thanks" class="screen" hidden>
+  <!-- 送信後：受付番号（回答の中身は出さない） -->
+  <section id="s-number" class="screen" hidden>
     <div class="center">
-      <p class="big-check" aria-hidden="true">✓</p>
       <p class="lead">ありがとうございました。</p>
-      <p class="lead">この端末を受付にお返しください。</p>
-      <p class="sub">お呼びするまで、お待ちください。お大事になさってください。</p>
+      <p class="number-label">受付番号</p>
+      <p id="number" class="number"></p>
+      <p class="lead">この画面のまま、タブレットを<br>受付にお持ちください。</p>
     </div>
+    <footer class="nav">
+      <button id="btn-to-register" class="btn staff" type="button">患者IDを登録する（職員用）</button>
+    </footer>
   </section>
 
-  <button id="btn-abort" class="abort" hidden>受付へ戻る</button>
+  <!-- 職員：受付番号に患者IDを登録 -->
+  <section id="s-register" class="screen" hidden>
+    <header class="staff-head">
+      <span class="badge">受付用</span>
+      <h1>患者IDの登録</h1>
+    </header>
+    <div class="step">
+      <p class="sub">受付番号 <b id="reg-number" class="reg-number"></b>　<span id="reg-form"></span></p>
+      <input id="pcode" class="pcode-input" inputmode="numeric" autocomplete="off" placeholder="患者ID" aria-label="患者ID">
+      <p id="pcode-msg" class="warn" hidden></p>
+    </div>
+    <footer class="nav">
+      <button id="btn-reg-later" class="btn" type="button">あとで登録</button>
+      <button id="btn-reg-check" class="btn primary" type="button" disabled>確認へ進む</button>
+    </footer>
+  </section>
+
+  <!-- 登録完了 -->
+  <section id="s-done" class="screen" hidden>
+    <div class="center">
+      <p class="big-check" aria-hidden="true">✓</p>
+      <p class="lead">登録しました</p>
+      <p class="sub" id="done-text"></p>
+    </div>
+  </section>
 </main>
 
-<!-- 受付：患者IDの確認 -->
+<!-- 職員：患者IDの確認 -->
 <div id="dlg-confirm" class="overlay" hidden>
   <div class="dialog">
-    <p class="dlg-title">この内容で問診をはじめます</p>
-    <p class="dlg-label">患者ID</p>
-    <p id="confirm-pcode" class="confirm-pcode"></p>
-    <p class="dlg-label">問診票</p>
+    <p class="dlg-title">この内容で登録します</p>
+    <div class="confirm-grid">
+      <div><p class="dlg-label">受付番号</p><p id="confirm-number" class="confirm-number"></p></div>
+      <div><p class="dlg-label">患者ID</p><p id="confirm-pcode" class="confirm-pcode"></p></div>
+    </div>
     <p id="confirm-form" class="confirm-form"></p>
+    <p id="confirm-msg" class="warn" hidden></p>
     <div class="dlg-actions">
-      <button id="btn-confirm-no" class="btn">入力しなおす</button>
-      <button id="btn-confirm-yes" class="btn primary">まちがいない・開始</button>
+      <button id="btn-confirm-no" class="btn" type="button">入力しなおす</button>
+      <button id="btn-confirm-yes" class="btn primary" type="button">まちがいない・登録</button>
     </div>
   </div>
 </div>
@@ -98,7 +132,7 @@
     <p class="dlg-title">問診を続けますか？</p>
     <p class="sub">あと <b id="idle-count"></b> 秒で、最初の画面にもどります。</p>
     <div class="dlg-actions">
-      <button id="btn-idle-continue" class="btn primary wide">続ける</button>
+      <button id="btn-idle-continue" class="btn primary" type="button">続ける</button>
     </div>
   </div>
 </div>
@@ -106,11 +140,11 @@
 <!-- 中止の確認（職員用） -->
 <div id="dlg-abort" class="overlay" hidden>
   <div class="dialog">
-    <p class="dlg-title">問診を中止して受付画面に戻りますか？</p>
+    <p class="dlg-title">最初の画面に戻りますか？</p>
     <p class="sub">入力中の回答は消えます。</p>
     <div class="dlg-actions">
-      <button id="btn-abort-no" class="btn">続ける</button>
-      <button id="btn-abort-yes" class="btn danger">中止する</button>
+      <button id="btn-abort-no" class="btn" type="button">続ける</button>
+      <button id="btn-abort-yes" class="btn danger" type="button">最初に戻る</button>
     </div>
   </div>
 </div>

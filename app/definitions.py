@@ -6,12 +6,38 @@ import os
 from . import yamlmini
 
 TYPES = ("text", "single", "multi", "number", "time")
-TAGS = ("主訴", "現病歴", "既往歴", "内服薬", "アレルギー", "生活歴", "その他")
+TAGS = ("基本情報", "主訴", "現病歴", "既往歴", "内服薬", "アレルギー", "生活歴", "その他")
+COND_OPS = ("eq", "ne", "lt", "gte")
 CHOICE_TYPES = ("single", "multi")
 
 
 class DefinitionError(ValueError):
     pass
+
+
+def _check_cond(cond, seen):
+    """show_if の書き方を確認する。参照先はこの設問より前にあること。"""
+    if isinstance(cond, dict) and "all" in cond:
+        if not isinstance(cond["all"], list) or not cond["all"]:
+            return ["show_if の all には条件を1つ以上並べてください"]
+        out = []
+        for c in cond["all"]:
+            out.extend(_check_cond(c, seen))
+        return out
+    ops = [k for k in COND_OPS if isinstance(cond, dict) and k in cond]
+    if not isinstance(cond, dict) or "q" not in cond or len(ops) != 1:
+        return ["show_if は q と、eq / ne / lt / gte のどれか1つを書いてください"]
+    if cond["q"] not in seen:
+        return [f"show_if の q「{cond['q']}」はこの設問より前にありません"]
+    ref = seen[cond["q"]]
+    op = ops[0]
+    if op in ("eq", "ne"):
+        labels = [o.get("label") for o in ref.get("options") or [] if isinstance(o, dict)]
+        if labels and cond[op] not in labels:
+            return [f"show_if の {op}「{cond[op]}」は {cond['q']} の選択肢にありません"]
+    elif ref.get("type") != "number" or not isinstance(cond[op], (int, float)):
+        return [f"show_if の {op} は数値の設問に対して数字で書いてください"]
+    return []
 
 
 def validate(d):
@@ -62,15 +88,7 @@ def validate(d):
                     errs.append(f"{where}: 同じ選択肢が重複しています")
         cond = q.get("show_if")
         if cond is not None:
-            if not isinstance(cond, dict) or "q" not in cond or "eq" not in cond:
-                errs.append(f"{where}: show_if は q と eq を書いてください")
-            elif cond["q"] not in seen:
-                errs.append(f"{where}: show_if の q「{cond['q']}」はこの設問より前にありません")
-            else:
-                ref = seen[cond["q"]]
-                ref_labels = [o.get("label") for o in ref.get("options") or [] if isinstance(o, dict)]
-                if ref_labels and cond["eq"] not in ref_labels:
-                    errs.append(f"{where}: show_if の eq「{cond['eq']}」は {cond['q']} の選択肢にありません")
+            errs.extend(f"{where}: {e}" for e in _check_cond(cond, seen))
         if qid and isinstance(qid, str):
             seen[qid] = q
     if errs:

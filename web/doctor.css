@@ -5,6 +5,8 @@ body.doctor { font-size: 16px; background: var(--bg); }
   padding: 14px 20px; background: var(--card); border-bottom: 1px solid var(--line);
 }
 .d-head h1 { font-size: 1.3rem; }
+.d-link { font-size: .8rem; font-weight: 400; margin-left: 14px; color: var(--accent); }
+body.karte .d-link { display: none; }
 .d-filters { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
 .d-filters label { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: .9rem; }
 .d-filters input { border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 1rem; width: 150px; background: #fff; }
@@ -41,6 +43,26 @@ body.doctor { font-size: 16px; background: var(--bg); }
 .d-qa .q { color: var(--muted); font-size: .9rem; }
 .d-qa .a { font-weight: 700; }
 .d-qa .a.empty { color: var(--muted); font-weight: 400; }
+
+/* 患者IDつきで開いたとき（電子カルテの【問診】から）：一覧は出さず、その患者さんの当日分だけ */
+body.karte .d-list-wrap, body.karte .d-filters { display: none; }
+body.karte .d-body { grid-template-columns: 1fr; }
+.k-title { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.k-title .pc { font-variant-numeric: tabular-nums; letter-spacing: .04em; }
+.k-title .day { color: var(--muted); font-size: .9rem; }
+.k-record + .k-record { margin-top: 20px; }
+.k-record .d-meta { margin-top: 0; }
+
+/* 受付待ち一覧 */
+.r-body { padding: 16px 20px; }
+.r-body .sub { margin: 0 0 12px; font-size: .95rem; }
+.r-table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.r-table th, .r-table td { padding: 10px 14px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+.r-table th { font-size: .85rem; color: var(--muted); background: var(--bg); }
+.r-num { font-size: 1.4rem; font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums; width: 110px; }
+.r-input { font-size: 1.15rem; letter-spacing: .08em; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; width: 200px; background: #fff; }
+.confirm-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; }
+.confirm-number { font-size: 3rem; font-weight: 700; margin: 0; color: var(--accent); }
 
 .d-note { margin: 0 20px 16px; color: var(--muted); font-size: .8rem; text-align: right; }
 .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 10px 20px; border-radius: 999px; font-weight: 700; }

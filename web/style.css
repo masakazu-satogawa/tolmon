@@ -11,22 +11,52 @@
   --warn: #b3261e;
   --warn-soft: #fbeceb;
   --radius: 14px;
-  font-size: 22px;
+  --vh: 1vh;          /* patient.js が window.innerHeight から上書き（iPadのアドレスバー対策） */
+  --topbar: 56px;
+  font-size: 20px;
 }
+/* 文字の大きさ 小・中・大（patient.js が html に fs-s / fs-m / fs-l を付ける）
+   rem で組んであるので、ここを変えるだけで全体が追従する。どのサイズでも横にはみ出さない */
+html.fs-s { font-size: 17px; }
+html.fs-m { font-size: 20px; }
+html.fs-l { font-size: 25px; }
 
-* { box-sizing: border-box; }
-html, body { margin: 0; background: var(--bg); color: var(--ink); }
+* { box-sizing: border-box; min-width: 0; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); overflow-x: hidden; }
 body {
   font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", sans-serif;
   line-height: 1.6;
   -webkit-text-size-adjust: 100%;
   touch-action: manipulation;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
-button, input, textarea, select { font: inherit; color: inherit; }
+button, input, textarea, select { font: inherit; color: inherit; max-width: 100%; }
 [hidden] { display: none !important; }
 
-#app { max-width: 900px; margin: 0 auto; padding: 52px 24px 40px; min-height: 100vh; position: relative; }
-.screen { display: flex; flex-direction: column; gap: 20px; min-height: calc(100vh - 92px); }
+#app { max-width: 900px; margin: 0 auto; padding: 16px 24px 32px; min-height: calc(var(--vh) * 100); position: relative; }
+.screen { display: flex; flex-direction: column; gap: 20px; min-height: calc(var(--vh) * 100 - 48px); }
+body.has-topbar #app { padding-top: calc(var(--topbar) + 12px); }
+body.has-topbar .screen { min-height: calc(var(--vh) * 100 - var(--topbar) - 44px); }
+
+/* 上の帯（患者さんが答えている間だけ）：文字の大きさ・職員用の中止 */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; height: var(--topbar); z-index: 5;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 0 16px; background: var(--bg); border-bottom: 1px solid var(--line);
+  font-size: 16px;   /* 帯の中は文字サイズ設定の影響を受けない（常に同じ大きさ） */
+}
+.fs-switch { display: flex; align-items: center; gap: 6px; }
+.fs-label { color: var(--muted); margin-right: 4px; }
+.fs-switch button {
+  min-width: 44px; height: 40px; border-radius: 10px; border: 2px solid var(--line); background: var(--card);
+  font-weight: 700; cursor: pointer;
+}
+.fs-switch button[data-fs="s"] { font-size: 14px; }
+.fs-switch button[data-fs="m"] { font-size: 17px; }
+.fs-switch button[data-fs="l"] { font-size: 21px; }
+.fs-switch button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.abort { background: transparent; border: 1px solid var(--line); color: var(--muted); border-radius: 999px; padding: 6px 14px; font-size: 13px; cursor: pointer; }
 .center { margin: auto; text-align: center; display: flex; flex-direction: column; gap: 12px; align-items: center; }
 
 h1, h2 { margin: 0; line-height: 1.4; }
@@ -44,15 +74,17 @@ h1, h2 { margin: 0; line-height: 1.4; }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .btn.danger { background: var(--warn); border-color: var(--warn); color: #fff; }
 .btn.wide { width: 100%; }
-.btn.huge { font-size: 1.4rem; min-height: 96px; min-width: 320px; margin-top: 24px; }
+.btn.huge { font-size: 1.4rem; min-height: 96px; width: min(320px, 100%); margin-top: 24px; }
+.btn.staff { font-size: .8rem; min-height: 56px; color: var(--muted); }
 
 /* 受付 */
 .staff-head { display: flex; align-items: center; gap: 12px; }
-.badge { background: var(--ink); color: #fff; font-size: .75rem; padding: 4px 10px; border-radius: 999px; }
+.badge { background: var(--ink); color: #fff; font-size: .75rem; padding: 4px 10px; border-radius: 999px; white-space: nowrap; flex: none; }
 .step { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; display: flex; flex-direction: column; gap: 14px; }
 .step h2 { font-size: 1.05rem; display: flex; align-items: center; gap: 10px; }
 .num { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: #fff; font-size: .9rem; }
-.form-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.form-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.form-choice { min-height: 110px; font-size: 1.15rem; justify-content: center; text-align: center; }
 .pcode-input {
   font-size: 2rem; letter-spacing: .15em; padding: 12px 16px; border: 2px solid var(--line);
   border-radius: var(--radius); width: 100%; background: #fff;
@@ -106,8 +138,12 @@ textarea:focus, .q-input:focus { outline: 3px solid var(--accent); border-color:
 
 .big-check { font-size: 5rem; color: var(--accent); margin: 0; line-height: 1; }
 
-/* 中止ボタン（職員用・目立たせない） */
-.abort { position: fixed; top: 10px; right: 12px; background: transparent; border: 1px solid var(--line); color: var(--muted); border-radius: 999px; padding: 6px 14px; font-size: .7rem; }
+/* 受付番号（送信後） */
+.number-label { color: var(--muted); margin: 16px 0 0; }
+.number { font-size: 7rem; font-weight: 800; line-height: 1; margin: 0 0 16px; color: var(--accent); font-variant-numeric: tabular-nums; }
+.reg-number { font-size: 1.6rem; color: var(--accent); }
+.confirm-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; }
+.confirm-number { font-size: 3rem; font-weight: 700; margin: 0; color: var(--accent); }
 
 /* ダイアログ */
 .overlay { position: fixed; inset: 0; background: rgba(20, 28, 26, .55); display: grid; place-items: center; padding: 20px; z-index: 10; }
@@ -120,7 +156,12 @@ textarea:focus, .q-input:focus { outline: 3px solid var(--accent); border-color:
 .dlg-actions .btn { flex: 1; }
 
 @media (max-width: 600px) {
-  :root { font-size: 19px; }
-  #app { padding: 16px 16px 32px; }
+  html.fs-s { font-size: 15px; }
+  html.fs-m { font-size: 17px; }
+  html.fs-l { font-size: 21px; }
+  #app { padding-left: 16px; padding-right: 16px; }
   .detail { margin-left: 0; }
+  .number { font-size: 5rem; }
+  .confirm-grid { grid-template-columns: 1fr; }
+  .fs-label { display: none; }
 }

@@ -1,21 +1,70 @@
-"""回答の検証と保存（TXT＋JSON＋CSV索引）。上書きせず、途中で壊れない書き方をする。"""
+"""回答の検証と保存。
 
-import csv
+流れ（A案）：
+  1. 患者さんが送信 → SQLite に「受付待ち」（患者IDなし）で保存し、その日の受付番号を返す
+  2. 受付が受付番号に患者IDを登録 → 開示用の TXT を書き出す
+患者IDが登録されなかった回答も消さずに残す。
+"""
+
 import json
 import os
 import re
+import sqlite3
 import threading
 from datetime import datetime
 
 from . import karte
 
-INDEX_HEADER = ["record_id", "received_at", "pcode", "form_id", "form_title", "form_version", "form_hash", "txt_path"]
 _lock = threading.Lock()
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS records (
+  record_id     TEXT PRIMARY KEY,   -- 20261104-007（日付-受付番号）
+  day           TEXT NOT NULL,      -- 2026-11-04
+  number        INTEGER NOT NULL,   -- その日の受付番号（1から）
+  form_id       TEXT NOT NULL,
+  form_title    TEXT NOT NULL,
+  form_version  TEXT,
+  form_hash     TEXT,
+  created_at    TEXT NOT NULL,      -- 送信した時刻
+  started_at    TEXT,               -- 回答を始めた時刻（端末の時計）
+  pcode         TEXT,               -- 患者ID（受付で登録するまで NULL）
+  registered_at TEXT,
+  txt_path      TEXT,               -- 開示用TXT（data からの相対パス）
+  data          TEXT NOT NULL,      -- 回答・カルテ向け文章・表示した設問・定義のスナップショット（JSON）
+  UNIQUE (day, number)
+);
+CREATE INDEX IF NOT EXISTS idx_records_pcode_day ON records (pcode, day);
+"""
+
+LIST_COLUMNS = "record_id, day, number, form_id, form_title, created_at, pcode, registered_at"
 
 
 class AnswerError(ValueError):
     pass
 
+
+# ---------------------------------------------------------------- データベース
+
+def db_path(data_dir):
+    return os.path.join(data_dir, "tolmon.sqlite3")
+
+
+def _connect(data_dir):
+    os.makedirs(data_dir, exist_ok=True)
+    con = sqlite3.connect(db_path(data_dir), timeout=10)
+    con.row_factory = sqlite3.Row
+    return con
+
+
+def init_db(data_dir):
+    with _connect(data_dir) as con:
+        con.execute("PRAGMA journal_mode=WAL")
+        con.executescript(SCHEMA)
+    con.close()
+
+
+# ---------------------------------------------------------------- 回答の検証
 
 def clean_answers(defn, raw):
     """送られてきた回答を定義と照らし合わせ、表示された設問の正しい値だけを残す。"""
@@ -44,9 +93,8 @@ def clean_answers(defn, raw):
             chosen = v
         elif t == "number":
             if v not in (None, ""):
-                try:
-                    num = float(str(v).replace(",", "."))
-                except ValueError:
+                num = karte._num(v)
+                if num is None:
                     raise AnswerError(f"「{q['text']}」は数字で入力してください")
                 if ("min" in q and num < q["min"]) or ("max" in q and num > q["max"]):
                     raise AnswerError(f"「{q['text']}」の数字が範囲外です")
@@ -63,6 +111,42 @@ def clean_answers(defn, raw):
     return answers
 
 
+# ---------------------------------------------------------------- 保存（受付待ち）
+
+def save_pending(data_dir, defn, raw_answers, meta):
+    """回答を「受付待ち」で保存し、その日の受付番号を振る。"""
+    answers = clean_answers(defn, raw_answers)
+    now = datetime.now()
+    when = now.strftime("%Y/%m/%d %H:%M")
+    day = now.strftime("%Y-%m-%d")
+    data = {
+        "answers": answers,
+        "karte_text": karte.karte_text(defn, answers, when),
+        "shown": karte.shown_questions(defn, answers),
+        "client": meta.get("client"),
+        "form_file": defn.get("_file"),
+        "definition_snapshot": {k: v for k, v in defn.items() if not k.startswith("_")},
+    }
+    with _lock:
+        con = _connect(data_dir)
+        try:
+            with con:
+                con.execute("BEGIN IMMEDIATE")
+                number = con.execute("SELECT COALESCE(MAX(number), 0) + 1 FROM records WHERE day = ?", (day,)).fetchone()[0]
+                record_id = f"{now.strftime('%Y%m%d')}-{number:03d}"
+                con.execute(
+                    "INSERT INTO records (record_id, day, number, form_id, form_title, form_version, form_hash,"
+                    " created_at, started_at, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (record_id, day, number, defn["id"], defn["title"], str(defn.get("version", "")),
+                     defn.get("_hash"), now.isoformat(timespec="seconds"), meta.get("started_at"),
+                     json.dumps(data, ensure_ascii=False)))
+        finally:
+            con.close()
+    return {"record_id": record_id, "number": number}
+
+
+# ---------------------------------------------------------------- 患者IDの登録
+
 def _atomic_write(path, text):
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8", newline="\n") as f:
@@ -72,96 +156,83 @@ def _atomic_write(path, text):
     os.replace(tmp, path)
 
 
-def save(data_dir, defn, pcode, raw_answers, meta):
-    answers = clean_answers(defn, raw_answers)
-    now = datetime.now()
-    when = now.strftime("%Y/%m/%d %H:%M")
-    folder = os.path.join(data_dir, "answers", now.strftime("%Y"), now.strftime("%m"))
-    os.makedirs(folder, exist_ok=True)
+def _disclosure_text(row, data):
+    lines = [data["karte_text"], "", "=" * 40, "表示した設問と回答（開示用）", "=" * 40]
+    for i, s in enumerate(data["shown"], start=1):
+        lines.append(f"Q{i}. {s['text']}")
+        lines.append(f"  → {s['answer']}")
+    lines += [
+        "",
+        f"患者ID: {row['pcode']}",
+        f"受付番号: {row['number']}（{row['day']}）",
+        f"問診票: {row['form_title']}（id={row['form_id']} / 版={row['form_version']} / hash={row['form_hash']}）",
+        f"開始: {row['started_at'] or ''}",
+        f"送信: {row['created_at']}",
+        f"患者ID登録: {row['registered_at']}",
+        f"記録ID: {row['record_id']}",
+    ]
+    return "\n".join(lines) + "\n"
 
-    text_karte = karte.karte_text(defn, answers, when)
-    shown = karte.shown_questions(defn, answers)
-    snapshot = {k: v for k, v in defn.items() if not k.startswith("_")}
 
+def register(data_dir, record_id, pcode):
+    """受付番号の回答に患者IDを結び、開示用TXTを書き出す。"""
     with _lock:
-        base = f"{now.strftime('%Y%m%d-%H%M%S')}_{pcode}_{defn['id']}"
-        n = 1
-        record_id = base
-        while os.path.exists(os.path.join(folder, record_id + ".json")):
-            n += 1
-            record_id = f"{base}-{n}"
-        txt_path = os.path.join(folder, record_id + ".txt")
-        json_path = os.path.join(folder, record_id + ".json")
-
-        lines = [
-            text_karte,
-            "",
-            "=" * 40,
-            "表示した設問と回答（開示用）",
-            "=" * 40,
-        ]
-        for i, s in enumerate(shown, start=1):
-            lines.append(f"Q{i}. {s['text']}")
-            lines.append(f"  → {s['answer']}")
-        lines += [
-            "",
-            f"患者ID: {pcode}",
-            f"問診票: {defn['title']}（id={defn['id']} / 版={defn.get('version', '')} / hash={defn.get('_hash', '')}）",
-            f"開始: {meta.get('started_at', '')}",
-            f"送信: {now.isoformat(timespec='seconds')}",
-            f"記録ID: {record_id}",
-        ]
-        _atomic_write(txt_path, "\n".join(lines) + "\n")
-
-        record = {
-            "record_id": record_id,
-            "pcode": pcode,
-            "received_at": now.isoformat(timespec="seconds"),
-            "started_at": meta.get("started_at"),
-            "client": meta.get("client"),
-            "form": {"id": defn["id"], "title": defn["title"], "version": defn.get("version"),
-                     "hash": defn.get("_hash"), "file": defn.get("_file")},
-            "answers": answers,
-            "karte_text": text_karte,
-            "shown": shown,
-            "definition_snapshot": snapshot,
-        }
-        _atomic_write(json_path, json.dumps(record, ensure_ascii=False, indent=2))
-
-        index = os.path.join(data_dir, "answers", "index.csv")
-        new = not os.path.exists(index)
-        with open(index, "a", encoding="utf-8-sig" if new else "utf-8", newline="") as f:
-            w = csv.writer(f)
-            if new:
-                w.writerow(INDEX_HEADER)
-            w.writerow([record_id, record["received_at"], pcode, defn["id"], defn["title"],
-                        defn.get("version", ""), defn.get("_hash", ""),
-                        os.path.relpath(txt_path, data_dir).replace("\\", "/")])
-    return record
+        con = _connect(data_dir)
+        try:
+            row = con.execute("SELECT * FROM records WHERE record_id = ?", (record_id,)).fetchone()
+            if row is None:
+                raise AnswerError("この受付番号の回答が見つかりません")
+            if row["pcode"]:
+                raise AnswerError(f"受付番号 {row['number']} はすでに患者ID {row['pcode']} で登録済みです")
+            now = datetime.now().isoformat(timespec="seconds")
+            rel = os.path.join("answers", row["day"][:4], row["day"][5:7], f"{record_id}_{pcode}_{row['form_id']}.txt")
+            path = os.path.join(data_dir, rel)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            row = dict(row, pcode=pcode, registered_at=now)
+            _atomic_write(path, _disclosure_text(row, json.loads(row["data"])))
+            with con:
+                con.execute("UPDATE records SET pcode = ?, registered_at = ?, txt_path = ? WHERE record_id = ? AND pcode IS NULL",
+                            (pcode, now, rel.replace("\\", "/"), record_id))
+        finally:
+            con.close()
+    return {"record_id": record_id, "number": row["number"], "pcode": pcode}
 
 
-def list_records(data_dir, date=None, pcode=None):
-    index = os.path.join(data_dir, "answers", "index.csv")
-    if not os.path.exists(index):
-        return []
-    with _lock, open(index, encoding="utf-8-sig", newline="") as f:
-        rows = list(csv.DictReader(f))
-    if date:
-        rows = [r for r in rows if r["received_at"].startswith(date)]
+# ---------------------------------------------------------------- 読み出し
+
+def _rows(data_dir, sql, args):
+    con = _connect(data_dir)
+    try:
+        return [dict(r) for r in con.execute(sql, args).fetchall()]
+    finally:
+        con.close()
+
+
+def list_registered(data_dir, day=None, pcode=None):
+    sql = f"SELECT {LIST_COLUMNS} FROM records WHERE pcode IS NOT NULL"
+    args = []
+    if day:
+        sql += " AND day = ?"
+        args.append(day)
     if pcode:
-        rows = [r for r in rows if r["pcode"] == pcode]
-    rows.reverse()  # 新しい順
-    return rows
+        sql += " AND pcode = ?"
+        args.append(pcode)
+    return _rows(data_dir, sql + " ORDER BY created_at DESC", args)
 
 
-_RID = re.compile(r"^\d{8}-\d{6}_[0-9A-Za-z]+_[0-9A-Za-z_\-]+$")
+def list_pending(data_dir, day):
+    return _rows(data_dir, f"SELECT {LIST_COLUMNS} FROM records WHERE pcode IS NULL AND day = ? ORDER BY number", (day,))
+
+
+_RID = re.compile(r"^\d{8}-\d{3,}$")
 
 
 def load_record(data_dir, record_id):
     if not _RID.match(record_id):
         return None
-    path = os.path.join(data_dir, "answers", record_id[:4], record_id[4:6], record_id + ".json")
-    if not os.path.exists(path):
+    rows = _rows(data_dir, "SELECT * FROM records WHERE record_id = ?", (record_id,))
+    if not rows:
         return None
-    with open(path, encoding="utf-8") as f:
-        return json.load(f)
+    rec = rows[0]
+    rec.update(json.loads(rec.pop("data")))
+    return rec
