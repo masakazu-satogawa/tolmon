@@ -151,6 +151,7 @@ function showResult(r) {
   if (u.read) parts.push("モデル " + u.read.model);
   $("usage").textContent = parts.join(" ／ ");
   $("save-msg").hidden = true;
+  renderDummy(r.dummy || null);
   setStep(2);
 }
 
@@ -260,6 +261,63 @@ function renderSkipped(skipped) {
   if (!skipped.length) list.appendChild(el("li", {}, "ありません"));
   $("n-skipped").textContent = skipped.length;
 }
+
+// ---------------------------------------------------------------- ダミー患者（Claude が架空の患者を作り、通しで確かめる）
+function renderDummy(d) {
+  var box = $("dummy-summary"), list = $("dummy-list"), n = $("n-dummy");
+  clear(box);
+  clear(list);
+  box.hidden = !d;
+  n.hidden = !d;
+  $("dummy-msg").textContent = "";
+  if (!d) return;
+  var s = d.summary;
+  n.textContent = s.ok + "/" + s.patients;
+  n.className = "n" + (s.errors ? " err" : "");
+  box.className = "d-summary" + (s.errors ? " ng" : "");
+  box.appendChild(el("p", { "class": "head" }, s.errors
+    ? s.patients + "人のうち " + s.errors + "人の回答が受け取れませんでした（下の赤い枠）。"
+    : s.patients + "人とも、最後まで答えてカルテ文になりました。"));
+  if (s.branches) box.appendChild(el("p", {}, "出し分けのある設問 " + s.branches + " 問のうち、" + s.branches_both + " 問で「出る人」と「出ない人」の両方を確かめました。"));
+  if (s.never_shown.length) box.appendChild(el("p", {}, "一度も出なかった設問：" + s.never_shown.join("／")));
+  if (s.branches_always.length) box.appendChild(el("p", {}, "全員に出た（出ない場合を確かめていない）設問：" + s.branches_always.join("／")));
+  var parts = [];
+  if (d.tested_at) parts.push("確認した日時 " + d.tested_at.slice(5, 16));
+  if (d.usage) parts.push(d.usage.seconds + "秒");
+  parts.push("直したあとは、もう一度確認してください");
+  box.appendChild(el("p", { "class": "small" }, parts.join(" ／ ")));
+  d.patients.forEach(function (p) {
+    var li = el("li", p.error ? { "class": "ng" } : {}, el("p", { "class": "d-persona" }, p.persona));
+    if (p.error) li.appendChild(el("p", { "class": "d-error" }, "受け取れなかった理由：" + p.error));
+    if (p.karte) li.appendChild(el("pre", { "class": "d-karte" }, p.karte));
+    p.notes.forEach(function (t) { li.appendChild(el("p", { "class": "d-note" }, t)); });
+    if (p.shown.length) {
+      var dl = el("dl", {});
+      p.shown.forEach(function (x) {
+        dl.appendChild(el("dt", {}, x.text));
+        dl.appendChild(el("dd", {}, x.answer));
+      });
+      li.appendChild(el("details", {}, el("summary", {}, "この人に出た設問と答え（" + p.shown.length + "問）"), dl));
+    }
+    list.appendChild(li);
+  });
+}
+$("btn-dummy").addEventListener("click", function () {
+  var m = $("dummy-msg"), btn = $("btn-dummy"), started = Date.now();
+  btn.disabled = true;
+  m.className = "a-inline";
+  var timer = setInterval(function () {
+    m.textContent = "Claude が架空の患者さんを作って答えています…（" + Math.round((Date.now() - started) / 1000) + "秒。1分ほどかかります）";
+  }, 500);
+  api("/api/creator/dummy", { form_id: A.formId, yaml: $("yaml").value, count: 5 }).then(function (d) {
+    clearInterval(timer);
+    renderDummy(d);
+  }).catch(function (e) {
+    clearInterval(timer);
+    m.className = "a-inline ng";
+    m.textContent = e.message;
+  }).then(function () { btn.disabled = false; });
+});
 
 // ---------------------------------------------------------------- タブ
 var tabs = document.querySelectorAll(".a-tabs button");

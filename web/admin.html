@@ -64,6 +64,7 @@
       <button type="button" data-tab="questions" aria-pressed="true">設問 <span id="n-questions" class="n"></span></button>
       <button type="button" data-tab="issues">Claudeの見直し <span id="n-issues" class="n"></span></button>
       <button type="button" data-tab="skipped">外した欄 <span id="n-skipped" class="n"></span></button>
+      <button type="button" data-tab="dummy">ダミー患者 <span id="n-dummy" class="n" hidden></span></button>
       <button type="button" data-tab="yaml">直す（YAML）</button>
     </div>
 
@@ -83,6 +84,15 @@
       <p class="sub">病院のルールで、設問にしなかった欄です。</p>
       <ul id="skip-list" class="skips"></ul>
       <details class="a-rules"><summary>この病院のルールを見る（creator/hospital_rules.md）</summary><pre id="rules"></pre></details>
+    </div>
+    <div id="tab-dummy" class="a-pane" hidden>
+      <p class="sub">Claude が架空の患者さんを作り、この問診に答えます。答えを本番と同じ手順で検証して、カルテにどう出るかを並べます。本物の患者さんの情報は使いません。</p>
+      <div class="a-actions">
+        <button id="btn-dummy" class="a-btn primary" type="button">ダミー患者5人で通し確認する</button>
+        <span id="dummy-msg" class="a-inline"></span>
+      </div>
+      <div id="dummy-summary" class="d-summary" hidden></div>
+      <ol id="dummy-list" class="d-list"></ol>
     </div>
     <div id="tab-yaml" class="a-pane" hidden>
       <p class="sub">文言・選択肢・分岐をここで直せます。直したら「反映して確認」を押してください。</p>

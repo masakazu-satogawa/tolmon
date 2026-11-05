@@ -9,7 +9,7 @@ from datetime import datetime
 
 from app import definitions, karte, store, yamlmini
 
-from . import claude_api, reader
+from . import claude_api, dummy, reader
 
 _FORM_ID = re.compile(r"^[a-z][a-z0-9_]{1,30}$")
 _drafts = {}                    # 読み取った下書き。問診ID → 結果（画面を開き直しても、起動し直しても消えない）
@@ -170,6 +170,24 @@ def trial_karte(body):
         raise ServiceError(str(e)) from e
     return {"karte": karte.karte_text(defn, answers, datetime.now().strftime("%Y/%m/%d %H:%M")),
             "shown": karte.shown_questions(defn, answers)}
+
+
+def dummy_test(body):
+    """架空の患者（ダミー）を Claude に作らせて、問診を通しで確かめる。1分ほどかかる。"""
+    res = check_yaml(body)
+    if not res["ok"]:
+        raise ServiceError("直してから試してください：" + " ／ ".join(res["problems"]))
+    try:
+        result = dummy.make(res["definition"], body.get("count", 5))
+    except claude_api.ClaudeError as e:
+        raise ServiceError(str(e)) from e
+    result["tested_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with _lock:                                   # 下書きに残す（画面を開き直しても見られるように）
+        d = _drafts.get(str(body.get("form_id", "")))
+        if d is not None:
+            d["dummy"] = result
+            _write_draft(d)
+    return result
 
 
 def save(body, def_dir):
