@@ -53,6 +53,7 @@ class App:
         self.creator = None
         if config.get("creator", {}).get("enabled"):
             from creator import service
+            service.use_draft_dir(self.data_dir)
             self.creator = service
 
     def reload(self):

@@ -24,7 +24,9 @@ function today() {
   return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
 }
 function api(path) {
-  return fetch(path).then(function (res) {
+  return fetch(path).catch(function () {
+    throw new Error("トルモンのサーバーにつながりません");
+  }).then(function (res) {
     return res.json().catch(function () { return {}; }).then(function (data) {
       if (!res.ok) throw new Error(data.error || "通信できませんでした");
       return data;

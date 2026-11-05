@@ -1,6 +1,7 @@
 """作る画面（/admin）からの依頼を受ける。サーバー（app/server.py）は、設定で有効なときだけここを読み込む。"""
 
 import base64
+import json
 import os
 import re
 import threading
@@ -12,6 +13,7 @@ from . import claude_api, reader
 _FORM_ID = re.compile(r"^[a-z][a-z0-9_]{1,30}$")
 _last = {}                      # 直近の読み取り結果（画面を開き直しても消えないように覚えておく）
 _lock = threading.Lock()
+_draft_file = None              # 直近の読み取り結果を置くファイル（use_draft_dir で決まる）
 
 
 class ServiceError(ValueError):
@@ -42,7 +44,37 @@ def read(body, model=claude_api.DEFAULT_MODEL):
     with _lock:
         _last.clear()
         _last.update(result)
+        _write_draft(result)
     return result
+
+
+def use_draft_dir(path):
+    """下書きの置き場所を決める。サーバーを起動し直しても、直前の読み取り結果を戻せるようにする。
+    置くのは白紙の帳票から作った設問の下書きだけ（患者さんの回答は入らない）。"""
+    global _draft_file
+    _draft_file = os.path.join(path, "creator_last.json")
+    try:
+        with open(_draft_file, encoding="utf-8") as f:
+            saved = json.load(f)
+    except (OSError, ValueError):
+        return
+    if isinstance(saved, dict):
+        with _lock:
+            _last.clear()
+            _last.update(saved)
+
+
+def _write_draft(result):
+    if not _draft_file:
+        return
+    try:
+        os.makedirs(os.path.dirname(_draft_file), exist_ok=True)
+        tmp = _draft_file + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(result, f, ensure_ascii=False)
+        os.replace(tmp, _draft_file)
+    except OSError:
+        pass                    # 覚えておけなくても、読み取り結果そのものは返す
 
 
 def last():

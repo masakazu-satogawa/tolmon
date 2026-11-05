@@ -45,7 +45,9 @@ function localIso(d) {
 }
 
 function api(path, opts) {
-  return fetch(path, opts).then(function (res) {
+  return fetch(path, opts).catch(function () {
+    throw new Error("通信できませんでした。職員に声をかけてください。");
+  }).then(function (res) {
     return res.json().catch(function () { return {}; }).then(function (data) {
       if (!res.ok) throw new Error(data.error || "通信できませんでした");
       return data;

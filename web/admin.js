@@ -22,7 +22,10 @@ function clear(node) { while (node.firstChild) node.removeChild(node.firstChild)
 function api(path, body) {
   var opts = body === undefined ? undefined
     : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
-  return fetch(path, opts).then(function (res) {
+  return fetch(path, opts).catch(function () {
+    // サーバーが止まっていると、ブラウザは英語の「Failed to fetch」しか出さない
+    throw new Error("トルモンのサーバーにつながりません。サーバーが起動しているか確かめてから、もう一度押してください。");
+  }).then(function (res) {
     return res.json().catch(function () { return {}; }).then(function (data) {
       if (!res.ok) throw new Error(data.error || "通信できませんでした");
       return data;

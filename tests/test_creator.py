@@ -70,6 +70,24 @@ class ServiceTest(unittest.TestCase):
             with self.assertRaises(service.ServiceError):
                 service.save({"yaml": text.replace('"ある"', '"あ"', 1)}, d)
 
+    def test_last_survives_restart(self):
+        # サーバーを起動し直しても、直前の読み取り結果を戻せる
+        old_file, old_last = service._draft_file, dict(service._last)
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                service.use_draft_dir(d)
+                service._write_draft({"form_id": "test_form", "definition": {"title": "テスト問診票"}})
+                service._last.clear()                       # 起動し直したのと同じ状態
+                service.use_draft_dir(d)
+                self.assertEqual(service.last()["definition"]["title"], "テスト問診票")
+                with open(os.path.join(d, "creator_last.json"), "w", encoding="utf-8") as f:
+                    f.write("{こわれている")
+                service.use_draft_dir(d)                    # 壊れていても起動は止めない
+        finally:
+            service._draft_file = old_file
+            service._last.clear()
+            service._last.update(old_last)
+
     def test_read_rejects_bad_input(self):
         for body in ({"form_id": "Bad ID", "name": "a.pdf", "data": "AAAA"},
                      {"form_id": "ok_id", "name": "a.txt", "data": "AAAA"},
