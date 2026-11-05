@@ -91,6 +91,9 @@ body.admin { font-size: 15px; background: var(--bg); overflow: visible; }
 .q-branch { margin: 8px 0 0; font-size: .85rem; color: #7a4b00; background: #fdf1d8; border-radius: 6px; padding: 3px 10px; display: inline-block; }
 .q-hint { margin: 6px 0 0; font-size: .85rem; color: var(--muted); }
 .q-source { margin: 8px 0 0; font-size: .78rem; color: var(--muted); border-left: 3px solid var(--line); padding-left: 8px; }
+.q-try { position: absolute; right: 10px; top: 10px; border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 3px 12px; font-size: .78rem; color: var(--accent); cursor: pointer; }
+.q-try:hover { background: var(--accent-soft); border-color: var(--accent); }
+.q-cards li .q-text { padding-right: 110px; }
 .q-issue { margin: 8px 0 0; font-size: .85rem; border-radius: 6px; padding: 6px 10px; background: var(--warn-soft); }
 .q-issue.warning { background: #fdf1d8; }
 .q-issue.info { background: var(--bg); }

@@ -81,14 +81,17 @@ $("form-id").addEventListener("input", updateReadButton);
 function showPaper(file) {
   if (A.paperUrl) URL.revokeObjectURL(A.paperUrl);
   A.paperUrl = URL.createObjectURL(file);
+  showPaperUrl(A.paperUrl, /pdf$/i.test(file.type) || /\.pdf$/i.test(file.name));
+}
+function showPaperUrl(url, isPdf) {
   var box = $("paper");
   clear(box);
-  if (/pdf$/i.test(file.type) || /\.pdf$/i.test(file.name)) {
+  if (isPdf) {
     box.className = "a-paper-box";
-    box.appendChild(el("iframe", { src: A.paperUrl + "#toolbar=0&view=FitH", title: "もとの帳票" }));
+    box.appendChild(el("iframe", { src: url + "#toolbar=0&view=FitH", title: "もとの帳票" }));
   } else {
     box.className = "a-paper-box scroll";
-    box.appendChild(el("img", { src: A.paperUrl, alt: "もとの帳票" }));
+    box.appendChild(el("img", { src: url, alt: "もとの帳票" }));
   }
   $("work").hidden = false;
 }
@@ -223,6 +226,10 @@ function renderQuestions() {
     if (q.show_if) li.appendChild(el("p", { "class": "q-branch" }, "出る条件：" + describeCond(q.show_if)));
     if (q.hint) li.appendChild(el("p", { "class": "q-hint" }, "ヒント：" + q.hint));
     if (A.sources[q.id]) li.appendChild(el("p", { "class": "q-source" }, "紙の文言：" + A.sources[q.id]));
+    // この設問だけ、患者さんの画面でどう見えるかをすぐ確かめる
+    var tryOne = el("button", { "class": "q-try", type: "button" }, "この設問を試す");
+    tryOne.addEventListener("click", function () { openTrial(q.id); });
+    li.appendChild(tryOne);
     mine.forEach(function (i) {
       li.appendChild(el("p", { "class": "q-issue " + i.severity }, "【見直し・" + i.kind + "】" + i.message));
     });
@@ -374,24 +381,27 @@ function save(overwrite) {
   });
 }
 // 公開する前に、患者さんの画面（タブレットと同じ画面）で最後まで試す。回答は保存されない
-$("btn-try").addEventListener("click", function () {
+$("btn-try").addEventListener("click", function () { openTrial(""); });
+// at：設問の id を渡すと、その設問から始める
+function openTrial(at) {
   var msg = $("save-msg");
+  var url = "/?try=1" + (at ? "&at=" + encodeURIComponent(at) : "");
   // 押した瞬間にタブを開いておく（あとから開くと、ブラウザに止められることがある）
   var w = window.open("about:blank", "tolmon_trial");
   checkYaml().then(function (r) {
     if (!r.ok) throw new Error("直すところがあります（赤い枠）。直してから試してください。");
     return api("/api/creator/trial", { yaml: $("yaml").value });
   }).then(function () {
-    if (w) w.location.href = "/?try=1"; else window.location.href = "/?try=1";
+    if (w) w.location.href = url; else window.location.href = url;
     msg.hidden = true;
-    setStep(4);
+    if (!at) setStep(4);
   }).catch(function (e) {
     if (w) w.close();
     msg.hidden = false;
     msg.className = "a-msg ng";
     msg.textContent = e.message;
   });
-});
+}
 
 $("btn-save").addEventListener("click", function () {
   checkYaml().then(function (r) { if (r.ok) save(false); else { $("save-msg").hidden = false; $("save-msg").className = "a-msg ng"; $("save-msg").textContent = "直すところがあります（上の赤い枠）"; } });
@@ -402,7 +412,14 @@ function showDraft(d) {
   showResult(d);
   $("read-msg").hidden = false;
   $("read-msg").className = "a-msg";
-  $("read-msg").textContent = "「" + d.definition.title + "」の下書き（" + (d.source_name || "") + "）を表示しています。紙と並べて見るには、同じファイルを選び直してください。読み取り直す必要はありません。";
+  if (d.paper) {
+    // 読み取ったときの紙を、下書きと一緒に取ってある。選び直さなくても左に出す
+    showPaperUrl("/api/creator/paper?form_id=" + encodeURIComponent(d.form_id) + "&t=" + encodeURIComponent(d.saved_at || ""), d.paper.media === "application/pdf");
+    $("read-msg").textContent = "「" + d.definition.title + "」の下書き（" + (d.source_name || "") + "）を開きました。読み取り直す必要はありません。";
+  } else {
+    clear($("paper"));
+    $("read-msg").textContent = "「" + d.definition.title + "」の下書き（" + (d.source_name || "") + "）を開きました。紙と並べて見るには、同じファイルを選び直してください。読み取り直す必要はありません。";
+  }
 }
 function loadDrafts() {
   return api("/api/creator/drafts").then(function (res) {
@@ -429,11 +446,15 @@ api("/api/creator/info").then(function (info) {
   $("rules").textContent = info.rules;
   $("a-env").textContent = info.has_key ? "読み取りに使うモデル：" + info.model : "APIキーがありません（.env に ANTHROPIC_API_KEY を書いてください）";
   if (!info.has_key) $("a-env").className = "a-env ng";
-  return api("/api/creator/last");
+  // /admin?form=問診ID でその下書きを、&tab=タブ名 でそのタブを開く。なければ、いちばん新しい下書き
+  var form = /[?&]form=([a-z][a-z0-9_]*)/.exec(window.location.search);
+  return api("/api/creator/last" + (form ? "?form_id=" + form[1] : ""));
 }).then(function (last) {
-  // 画面を開き直しても、いちばん新しい下書きを戻す（紙の表示だけは選び直しが必要）
   if (last && last.definition) showDraft(last);
   else loadDrafts();
+  var tab = /[?&]tab=([a-z]+)/.exec(window.location.search);
+  var btn = tab && document.querySelector('.a-tabs button[data-tab="' + tab[1] + '"]');
+  if (btn) btn.click();
 }).catch(function (e) {
   $("a-env").className = "a-env ng";
   $("a-env").textContent = e.message;

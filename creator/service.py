@@ -43,6 +43,8 @@ def read(body, model=claude_api.DEFAULT_MODEL):
         raise ServiceError(str(e)) from e
     result["form_id"] = form_id
     result["source_name"] = name
+    if _save_paper(form_id, data):
+        result["paper"] = {"media": media}      # 読み取った紙も取っておく（下書きを開いたとき、横に並べて見られるように）
     result["saved_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     with _lock:
         _drafts[form_id] = result
@@ -109,6 +111,35 @@ def save_draft(body):
         d["edited_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         _write_draft(d)
     return {"ok": True}
+
+
+def _paper_path(form_id):
+    return os.path.join(_draft_dir, form_id + ".paper") if _draft_dir and _FORM_ID.match(str(form_id)) else None
+
+
+def _save_paper(form_id, data):
+    path = _paper_path(form_id)
+    if not path:
+        return False
+    try:
+        os.makedirs(_draft_dir, exist_ok=True)
+        with open(path + ".tmp", "wb") as f:
+            f.write(data)
+        os.replace(path + ".tmp", path)
+        return True
+    except OSError:
+        return False
+
+
+def paper(form_id):
+    """下書きと一緒に取ってある紙（PDF・画像）。戻り値は (中身, 種類)。なければ None。"""
+    with _lock:
+        d = _drafts.get(str(form_id)) or {}
+    path = _paper_path(form_id)
+    if not d.get("paper") or not path or not os.path.exists(path):
+        return None
+    with open(path, "rb") as f:
+        return f.read(), d["paper"]["media"]
 
 
 def drafts():

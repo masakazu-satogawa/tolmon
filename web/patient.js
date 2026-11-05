@@ -638,7 +638,11 @@ setInterval(function () {
 
 // ---------------------------------------------------------------- 開始
 if (TRIAL) {
-  startTrial().catch(trialFailed);
+  startTrial().then(function () {
+    // 作る画面の「この設問を試す」から来たとき（?try=1&at=設問id）：その設問から始める
+    var m = /[?&]at=([a-z][a-z0-9_]*)/.exec(window.location.search);
+    if (m && findQ(m[1])) goTo(m[1]);
+  }).catch(trialFailed);
 } else {
   initReception().then(function () { show("reception"); }).catch(function (e) {
     document.body.textContent = "問診サーバーにつながりません：" + e.message;

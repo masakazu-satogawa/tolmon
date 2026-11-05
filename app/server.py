@@ -126,6 +126,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(app.creator.info())
             if path == "/api/creator/last":
                 return self._json(app.creator.last(qs.get("form_id")))
+            if path == "/api/creator/paper":
+                found = app.creator.paper(qs.get("form_id", ""))
+                if not found:
+                    return self._error(404, "この下書きの紙は取ってありません")
+                return self._send(200, found[0], found[1])
             if path == "/api/creator/drafts":
                 return self._json({"drafts": app.creator.drafts()})
             if path == "/api/creator/trial":
