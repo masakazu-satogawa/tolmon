@@ -76,7 +76,9 @@ READ_SYSTEM = """あなたは、病院の紙の問診票を、タブレットで
 - 紙に書かれている条件、または「この病院のルール」にある条件だけを使う。
 - 参照する設問は、必ずその設問より前にあること。q には設問の id、value には選択肢の label をそのまま入れる。
 - op は eq（それを選んだとき）、ne（それを選んでいないとき）、lt（数値が未満）、gte（数値が以上）。
-- 条件がなければ空の配列にする。複数入れると「すべて満たすとき」になる。
+  いくつでも選べる設問（multi）を参照したとき、eq は「選んだ中にそれが入っているとき」になる。
+- 条件がなければ空の配列にする。複数入れたときは show_if_mode で決まる：
+  all は「すべて満たすとき」、any は「どれか1つでも満たすとき」。条件が1つ以下なら all にしておく。
 
 # 文言
 - text（患者さん向け）：やさしい言葉、ていねいな言い方、短い1文。紙の意味を変えない。
@@ -142,9 +144,11 @@ READ_SCHEMA = {
                             "additionalProperties": False,
                         },
                     },
+                    "show_if_mode": {"type": "string", "enum": ["all", "any"],
+                                     "description": "show_if に複数の条件があるとき。all=すべて満たす、any=どれか1つでも満たす"},
                     "source": {"type": "string", "description": "もとになった紙の文言"},
                 },
-                "required": ["id", "type", "text", "karte", "tag", "required", "hint", "unit", "options", "show_if", "source"],
+                "required": ["id", "type", "text", "karte", "tag", "required", "hint", "unit", "options", "show_if", "show_if_mode", "source"],
                 "additionalProperties": False,
             },
         },
@@ -198,6 +202,9 @@ CHECK_SYSTEM = """あなたは、問診票の検査担当者です。
 - タイプ　：1つだけ選ぶ欄が multi になっている、数字の欄が text になっている、など。
 - 記入欄　：「ある（　　）」のような記入欄が detail として入っているか。
 - 分岐　　：show_if の条件が紙（またはルール）と合っているか。参照先の id と label が正しいか。
+  このアプリでは、eq は「それを選んだとき」。いくつでも選べる設問（multi）を参照した eq は
+  「選んだ中にそれが入っているとき」と判定されるので、multi に eq を使うこと自体は問題にしない。
+  参照先の設問に答えていないとき、eq と gte の条件は満たさない（出ない）、ne と lt の条件は満たす（出る）。
 - 文言　　：患者さん向けの文が、紙の意味を変えていないか。むずかしすぎないか。
 - ルール　：「この病院のルール」に反していないか（聞かない欄を聞いている、残す欄を外している、など）。
 
@@ -286,7 +293,7 @@ def to_definition(draft, form_id, version=1):
         if len(conds) == 1:
             d["show_if"] = conds[0]
         elif conds:
-            d["show_if"] = {"all": conds}
+            d["show_if"] = {("any" if q.get("show_if_mode") == "any" else "all"): conds}
         qs.append(d)
     return {"id": form_id, "title": draft.get("title") or form_id, "version": version, "questions": qs}
 

@@ -42,6 +42,11 @@ class ConvertTest(unittest.TestCase):
         self.assertEqual(byid["sex"]["options"][0], {"label": "男性"})   # label と同じ karte は省く
         self.assertEqual(byid["pregnancy"]["show_if"], {"all": [{"q": "sex", "ne": "男性"}, {"q": "age", "lt": 50}]})
         self.assertEqual(byid["memo"]["show_if"], {"q": "allergy", "eq": "ある"})
+        # 条件が複数で show_if_mode が any なら「どれか1つでも」
+        anyq = q("late", show_if=[{"q": "sex", "op": "eq", "value": "男性"}, {"q": "sex", "op": "eq", "value": "女性"}], show_if_mode="any")
+        d2 = reader.to_definition(dict(DRAFT, questions=DRAFT["questions"] + [anyq]), "test_form")
+        self.assertEqual(d2["questions"][-1]["show_if"], {"any": [{"q": "sex", "eq": "男性"}, {"q": "sex", "eq": "女性"}]})
+        self.assertEqual(reader.problems(d2), [])
 
     def test_yaml_roundtrip(self):
         d = reader.to_definition(DRAFT, "test_form")
