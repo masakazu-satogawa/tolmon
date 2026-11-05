@@ -1,0 +1,526 @@
+{
+ "note": "デモ・動作確認用の架空の患者さんです。Claude が作ったもので、実在の人物ではありません。",
+ "patients": [
+  {
+   "form_id": "jibi",
+   "persona": "72歳の男性。今朝起きたときから、ぐるぐるするめまいがあり、右耳が聞こえにくく耳鳴りもする。タブレットの文字入力は苦手。",
+   "answers": {
+    "age": {
+     "value": "72"
+    },
+    "sex": {
+     "value": "男性"
+    },
+    "myna_consent": {
+     "value": "はい"
+    },
+    "temp_now": {
+     "value": "36.4"
+    },
+    "temp_max": {
+     "value": "36.5"
+    },
+    "temp_max_date": {
+     "value": "今日"
+    },
+    "symptoms": {
+     "value": [
+      "めまい",
+      "聞こえが悪い",
+      "耳鳴り"
+     ]
+    },
+    "side_hearing": {
+     "value": "右"
+    },
+    "side_tinnitus": {
+     "value": "右"
+    },
+    "onset": {
+     "value": "今日から"
+    },
+    "onset_time": {
+     "value": "朝"
+    },
+    "allergy_food": {
+     "value": "ない"
+    },
+    "allergy_drug": {
+     "value": "わからない"
+    },
+    "current_visit": {
+     "value": "通院している"
+    },
+    "current_meds": {
+     "value": "のんでいる"
+    }
+   },
+   "pcode": "9000001"
+  },
+  {
+   "form_id": "jibi",
+   "persona": "29歳の女性。妊娠20週。1週間ほど前から鼻水と鼻づまりがあり、黄色い鼻水やのどの痛み、咳も出てきた。",
+   "answers": {
+    "age": {
+     "value": "29"
+    },
+    "sex": {
+     "value": "女性"
+    },
+    "myna_consent": {
+     "value": "いいえ"
+    },
+    "temp_now": {
+     "value": "37.2"
+    },
+    "temp_max": {
+     "value": "37.9"
+    },
+    "temp_max_date": {
+     "value": "昨日"
+    },
+    "symptoms": {
+     "value": [
+      "鼻がつまる",
+      "くしゃみ",
+      "鼻水",
+      "黄色や緑色のどろっとした鼻水",
+      "のどが痛い",
+      "咳が出る"
+     ]
+    },
+    "onset": {
+     "value": "1週間くらい前から"
+    },
+    "allergy_food": {
+     "value": "ある"
+    },
+    "allergy_food_items": {
+     "value": [
+      "えび・かに",
+      "その他"
+     ],
+     "details": {
+      "その他": "ごま"
+     }
+    },
+    "allergy_drug": {
+     "value": "ない"
+    },
+    "current_visit": {
+     "value": "通院している",
+     "details": {
+      "通院している": "妊婦健診（産婦人科）"
+     }
+    },
+    "current_meds": {
+     "value": "のんでいる",
+     "details": {
+      "のんでいる": "葉酸のサプリメント"
+     }
+    },
+    "pregnancy": {
+     "value": "妊娠中"
+    },
+    "pregnancy_weeks": {
+     "value": "20"
+    }
+   },
+   "pcode": "9000002"
+  },
+  {
+   "form_id": "naika",
+   "persona": "79歳の女性。昨日の夜から熱とせきがあり、以前から骨粗しょう症も気になっている。文字を打つのは苦手。",
+   "answers": {
+    "age": {
+     "value": "79"
+    },
+    "sex": {
+     "value": "女性"
+    },
+    "myna_consent": {
+     "value": "はい"
+    },
+    "temp_now": {
+     "value": "37.9"
+    },
+    "temp_max": {
+     "value": "38.4"
+    },
+    "temp_max_date": {
+     "value": "昨日"
+    },
+    "symptoms": {
+     "value": [
+      "熱がある",
+      "せき・たん",
+      "骨粗しょう症の相談"
+     ]
+    },
+    "last_meal": {
+     "value": "07:30"
+    },
+    "onset": {
+     "value": "昨日から"
+    },
+    "onset_time": {
+     "value": "夜"
+    },
+    "allergy_food": {
+     "value": "ない"
+    },
+    "allergy_drug": {
+     "value": "わからない"
+    },
+    "history": {
+     "value": "はい"
+    },
+    "medication": {
+     "value": "ある"
+    },
+    "smoking": {
+     "value": "吸わない"
+    },
+    "alcohol": {
+     "value": "飲まない"
+    },
+    "doctor_request": {
+     "value": "希望はない"
+    }
+   },
+   "pcode": "9000003"
+  },
+  {
+   "form_id": "naika",
+   "persona": "29歳の女性。妊娠20週で、今朝からのどの痛みと頭痛、少し熱っぽい。スマホ入力に慣れている。",
+   "answers": {
+    "age": {
+     "value": "29"
+    },
+    "sex": {
+     "value": "女性"
+    },
+    "myna_consent": {
+     "value": "いいえ"
+    },
+    "temp_now": {
+     "value": "37.4"
+    },
+    "temp_max": {
+     "value": "37.6"
+    },
+    "temp_max_date": {
+     "value": "今日"
+    },
+    "symptoms": {
+     "value": [
+      "熱がある",
+      "のどが痛い",
+      "頭が痛い"
+     ]
+    },
+    "last_meal": {
+     "value": "08:00"
+    },
+    "onset": {
+     "value": "今日から"
+    },
+    "onset_time": {
+     "value": "朝"
+    },
+    "allergy_food": {
+     "value": "ある"
+    },
+    "allergy_food_items": {
+     "value": [
+      "卵",
+      "その他"
+     ],
+     "details": {
+      "その他": "えび"
+     }
+    },
+    "allergy_drug": {
+     "value": "ある",
+     "details": {
+      "ある": "ロキソニンを飲んだときにじんましんが出ました"
+     }
+    },
+    "history": {
+     "value": "いいえ"
+    },
+    "medication": {
+     "value": "ない"
+    },
+    "smoking": {
+     "value": "吸わない"
+    },
+    "alcohol": {
+     "value": "飲まない"
+    },
+    "pregnancy": {
+     "value": "妊娠中"
+    },
+    "pregnancy_weeks": {
+     "value": "20"
+    },
+    "doctor_request": {
+     "value": "希望する医師がいる",
+     "details": {
+      "希望する医師がいる": "できれば女性の先生を希望します"
+     }
+    }
+   },
+   "pcode": "9000004"
+  },
+  {
+   "form_id": "seikatsu",
+   "persona": "72歳の男性。高血圧で通院中。たばこは40年以上吸っていて、そろそろやめたいと思っている。",
+   "answers": {
+    "meal_balance": {
+     "value": "はい"
+    },
+    "vegetable_freq": {
+     "value": "週に3〜5回"
+    },
+    "fried_food_freq": {
+     "value": "週に3〜5回"
+    },
+    "alcohol_freq": {
+     "value": "週に7回"
+    },
+    "snack_freq": {
+     "value": "0回"
+    },
+    "meal_count": {
+     "value": "3回"
+    },
+    "salty_food": {
+     "value": "多い"
+    },
+    "eating_out_freq": {
+     "value": "週に1〜2回"
+    },
+    "bento_freq": {
+     "value": "週に0〜1回"
+    },
+    "bread_freq": {
+     "value": "週に0〜1回"
+    },
+    "noodle_freq": {
+     "value": "週に2〜4回"
+    },
+    "exercise_habit": {
+     "value": "いいえ"
+    },
+    "daily_activity": {
+     "value": "はい"
+    },
+    "daytime_sleepiness": {
+     "value": "はい"
+    },
+    "daytime_headache": {
+     "value": "いいえ"
+    },
+    "eye_exam": {
+     "value": "いいえ"
+    },
+    "dental_visit": {
+     "value": "はい"
+    },
+    "smoking": {
+     "value": "はい"
+    },
+    "smoking_cessation_clinic": {
+     "value": "はい"
+    }
+   },
+   "pcode": "9000005"
+  },
+  {
+   "form_id": "seikatsu",
+   "persona": "68歳の女性。糖尿病で通院中。たばこは吸わず、毎朝夫と散歩をしているが、おやつがやめられない。",
+   "answers": {
+    "meal_balance": {
+     "value": "はい"
+    },
+    "vegetable_freq": {
+     "value": "週に5〜7回"
+    },
+    "fried_food_freq": {
+     "value": "週に0〜2回"
+    },
+    "alcohol_freq": {
+     "value": "週に0〜3回"
+    },
+    "snack_freq": {
+     "value": "2回以上"
+    },
+    "meal_count": {
+     "value": "4回以上"
+    },
+    "salty_food": {
+     "value": "少ない"
+    },
+    "eating_out_freq": {
+     "value": "週に0回"
+    },
+    "bento_freq": {
+     "value": "週に2〜4回"
+    },
+    "bread_freq": {
+     "value": "週に5回以上"
+    },
+    "noodle_freq": {
+     "value": "週に0〜1回"
+    },
+    "exercise_habit": {
+     "value": "はい"
+    },
+    "daily_activity": {
+     "value": "はい"
+    },
+    "daytime_sleepiness": {
+     "value": "いいえ"
+    },
+    "daytime_headache": {
+     "value": "いいえ"
+    },
+    "eye_exam": {
+     "value": "はい"
+    },
+    "dental_visit": {
+     "value": "はい"
+    },
+    "smoking": {
+     "value": "いいえ"
+    }
+   },
+   "pcode": "9000006"
+  },
+  {
+   "form_id": "seikei",
+   "persona": "80歳の女性。数か月前から右ひざが痛み、最近は腫れてきた。タブレットの操作は苦手で、文字はほとんど打たない。",
+   "answers": {
+    "age": {
+     "value": "80"
+    },
+    "sex": {
+     "value": "女性"
+    },
+    "myna_consent": {
+     "value": "はい"
+    },
+    "temp_now": {
+     "value": "36.5"
+    },
+    "temp_max": {
+     "value": "36.8"
+    },
+    "temp_max_when": {
+     "value": "わからない"
+    },
+    "site": {
+     "value": [
+      "r_knee"
+     ],
+     "main": "r_knee"
+    },
+    "symptoms": {
+     "value": [
+      "痛い",
+      "腫れ",
+      "こわばる"
+     ]
+    },
+    "onset": {
+     "value": "わからない"
+    },
+    "cause": {
+     "value": [
+      "思い当たらない"
+     ]
+    },
+    "past_illness": {
+     "value": [
+      "高血圧"
+     ]
+    },
+    "current_treatment": {
+     "value": "ある"
+    },
+    "drug_reaction": {
+     "value": "ない"
+    },
+    "grade": {
+     "value": "学生ではない"
+    }
+   },
+   "pcode": "9000007"
+  },
+  {
+   "form_id": "seikei",
+   "persona": "16歳の男子高校生。昨日のサッカー部の練習中に左足首をひねり、腫れて歩きにくい。",
+   "answers": {
+    "age": {
+     "value": "16"
+    },
+    "sex": {
+     "value": "男性"
+    },
+    "myna_consent": {
+     "value": "はい"
+    },
+    "temp_now": {
+     "value": "36.7"
+    },
+    "temp_max": {
+     "value": "36.9"
+    },
+    "temp_max_when": {
+     "value": "今日"
+    },
+    "site": {
+     "value": [
+      "l_ankle"
+     ],
+     "main": "l_ankle"
+    },
+    "symptoms": {
+     "value": [
+      "痛い",
+      "腫れ",
+      "動きにくい"
+     ]
+    },
+    "onset": {
+     "value": "昨日から"
+    },
+    "cause": {
+     "value": [
+      "ひねった",
+      "スポーツ中"
+     ]
+    },
+    "past_illness": {
+     "value": [
+      "かかったことはない"
+     ]
+    },
+    "current_treatment": {
+     "value": "ない"
+    },
+    "drug_reaction": {
+     "value": "薬をあまり飲んだことがないので分からない"
+    },
+    "grade": {
+     "value": "高校1年"
+    },
+    "club": {
+     "value": "サッカー"
+    }
+   },
+   "pcode": null
+  }
+ ]
+}

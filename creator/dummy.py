@@ -164,7 +164,7 @@ def run(defn, patients, when=None):
     results, cleaned_all = [], []
     for p in patients:
         raw, notes = to_raw(defn, p)
-        item = {"persona": p.get("persona", ""), "notes": notes, "error": "", "karte": "", "shown": []}
+        item = {"persona": p.get("persona", ""), "notes": notes, "error": "", "karte": "", "shown": [], "answers": None}
         try:
             cleaned = store.clean_answers(defn, raw)
         except store.AnswerError as e:
@@ -174,6 +174,7 @@ def run(defn, patients, when=None):
         dropped = [q["text"] for q in defn["questions"] if _answered(raw.get(q["id"])) and q["id"] not in cleaned]
         if dropped:
             item["notes"].append("出ない設問に答えていたので、その答えは使いませんでした：" + "／".join(dropped))
+        item["answers"] = cleaned          # 検証を通った回答（デモ用の架空の患者さんデータに使える）
         item["karte"] = karte.karte_text(defn, cleaned, when)
         item["shown"] = karte.shown_questions(defn, cleaned)
         results.append(item)
