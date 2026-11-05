@@ -152,6 +152,7 @@ function toNum(v) {
 }
 function checkCondition(c, answers) {
   if (c.all) return c.all.every(function (x) { return checkCondition(x, answers); });
+  if (c.any) return c.any.some(function (x) { return checkCondition(x, answers); });
   var ref = answers[c.q] || {};
   var v = ref.value;
   var answered = !(v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0));
@@ -214,7 +215,7 @@ function renderQuestion() {
     var longest = 0;
     q.options.forEach(function (o) { longest = Math.max(longest, o.label.length); });
     if (q.options.length >= 13 && longest <= 7) body.className += " cols3";
-    else if (q.options.length >= 6 && longest <= 20) body.className += " cols2";
+    else if (q.options.length >= 6 && longest <= 20) body.className += " cols2" + (q.options.length >= 13 ? " dense" : "");
     q.options.forEach(function (o, idx) {
       var on = chosen.indexOf(o.label) >= 0;
       var btn = el("button", { "class": "choice" + (multi ? " multi" : ""), type: "button", "aria-pressed": String(on) },

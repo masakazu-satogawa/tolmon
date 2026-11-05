@@ -121,6 +121,28 @@ class ServiceTest(unittest.TestCase):
             service._drafts.clear()
             service._drafts.update(old_drafts)
 
+    def test_save_draft(self):
+        # 人が直した内容は下書きに残る（公開はしない）
+        old_dir, old_drafts = service._draft_dir, dict(service._drafts)
+        text = reader.to_yaml(reader.to_definition(DRAFT, "test_form"))
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                service.use_draft_dir(d)
+                with self.assertRaises(service.ServiceError):
+                    service.save_draft({"form_id": "test_form", "yaml": text})       # 下書きがない
+                service._drafts["test_form"] = {"form_id": "test_form", "saved_at": "2026-11-05 10:00:00", "issues": [{"x": 1}]}
+                with self.assertRaises(service.ServiceError):
+                    service.save_draft({"form_id": "test_form", "yaml": "a: |\n  x"})
+                service.save_draft({"form_id": "test_form", "yaml": text.replace("テスト問診票", "直した問診票"), "issues": []})
+                service._drafts.clear()
+                service.use_draft_dir(d)
+                self.assertEqual(service.last("test_form")["definition"]["title"], "直した問診票")
+                self.assertEqual(service.last("test_form")["issues"], [])
+        finally:
+            service._draft_dir = old_dir
+            service._drafts.clear()
+            service._drafts.update(old_drafts)
+
     def test_read_rejects_bad_input(self):
         for body in ({"form_id": "Bad ID", "name": "a.pdf", "data": "AAAA"},
                      {"form_id": "ok_id", "name": "a.txt", "data": "AAAA"},

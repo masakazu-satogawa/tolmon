@@ -17,13 +17,14 @@ class DefinitionError(ValueError):
 
 def _check_cond(cond, seen):
     """show_if の書き方を確認する。参照先はこの設問より前にあること。"""
-    if isinstance(cond, dict) and "all" in cond:
-        if not isinstance(cond["all"], list) or not cond["all"]:
-            return ["show_if の all には条件を1つ以上並べてください"]
-        out = []
-        for c in cond["all"]:
-            out.extend(_check_cond(c, seen))
-        return out
+    for group in ("all", "any"):      # all = すべて満たすとき、any = どれか1つでも満たすとき
+        if isinstance(cond, dict) and group in cond:
+            if not isinstance(cond[group], list) or not cond[group]:
+                return [f"show_if の {group} には条件を1つ以上並べてください"]
+            out = []
+            for c in cond[group]:
+                out.extend(_check_cond(c, seen))
+            return out
     ops = [k for k in COND_OPS if isinstance(cond, dict) and k in cond]
     if not isinstance(cond, dict) or "q" not in cond or len(ops) != 1:
         return ["show_if は q と、eq / ne / lt / gte のどれか1つを書いてください"]

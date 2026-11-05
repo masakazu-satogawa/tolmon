@@ -181,6 +181,8 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json(app.creator.read(body))
                 if path == "/api/creator/check":
                     return self._json(app.creator.check_yaml(body))
+                if path == "/api/creator/draft":
+                    return self._json(app.creator.save_draft(body))
                 if path == "/api/creator/trial":
                     return self._json(app.creator.set_trial(body))
                 if path == "/api/creator/trial/karte":

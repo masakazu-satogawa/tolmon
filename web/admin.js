@@ -161,6 +161,7 @@ function renderProblems(list) {
 
 function describeCond(c) {
   if (c.all) return c.all.map(describeCond).join(" かつ ");
+  if (c.any) return c.any.map(describeCond).join(" または ");
   var q = (A.definition.questions || []).filter(function (x) { return x.id === c.q; })[0];
   var name = q ? "「" + q.karte + "」" : "「" + c.q + "」";
   if ("eq" in c) return name + "で「" + c.eq + "」を選んだとき";
@@ -289,6 +290,8 @@ $("btn-check").addEventListener("click", function () {
   checkYaml().then(function (r) {
     m.className = "a-inline " + (r.ok ? "ok" : "ng");
     m.textContent = r.ok ? "問題ありません。「設問」タブに反映しました" : "直すところがあります（上の赤い枠）";
+    // 直した内容を下書きに残す（画面を開き直しても消えないように）
+    if (r.ok && A.formId) return api("/api/creator/draft", { form_id: A.formId, yaml: $("yaml").value });
   }).catch(function (e) { m.className = "a-inline ng"; m.textContent = e.message; });
 });
 

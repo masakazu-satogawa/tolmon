@@ -90,6 +90,27 @@ def _write_draft(result):
         return False            # 置けなくても、読み取り結果そのものは返す
 
 
+def save_draft(body):
+    """人が直した YAML を、下書きに残す（公開はしない）。"""
+    form_id = str(body.get("form_id", ""))
+    res = check_yaml(body)
+    if not res["ok"]:
+        raise ServiceError("直してから保存してください：\n" + "\n".join(res["problems"]))
+    with _lock:
+        d = _drafts.get(form_id)
+        if d is None:
+            raise ServiceError("この問診IDの下書きがありません")
+        d["yaml"] = str(body["yaml"])
+        d["definition"] = res["definition"]
+        d["problems"] = []
+        for key in ("added", "issues"):         # 足した選択肢の印・見直しの指摘を、直した内容に合わせて入れ替える
+            if key in body:
+                d[key] = body[key]
+        d["edited_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        _write_draft(d)
+    return {"ok": True}
+
+
 def drafts():
     """読み取った下書きの一覧（新しい順）。"""
     with _lock:

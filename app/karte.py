@@ -23,6 +23,8 @@ def check_condition(cond, answers):
     """
     if "all" in cond:
         return all(check_condition(c, answers) for c in cond["all"])
+    if "any" in cond:
+        return any(check_condition(c, answers) for c in cond["any"])
     ref = answers.get(cond["q"]) or {}
     v = ref.get("value")
     answered = v not in (None, "", [])

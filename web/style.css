@@ -132,6 +132,9 @@ textarea:focus, .q-input:focus { outline: 3px solid var(--accent); border-color:
 .q-body.cols2 .choice, .q-body.cols3 .choice { min-height: 58px; padding: 8px 14px; gap: 10px; }
 .q-body.cols2 .choice .mark, .q-body.cols3 .choice .mark { width: 28px; height: 28px; border-width: 2px; font-size: .9rem; }
 .q-body.cols2 .detail, .q-body.cols3 .detail { grid-column: 1 / -1; margin: 0; }
+/* 7段以上になるときは少し詰める（画面の中に収めるため。指で押せる高さは保つ） */
+.q-body.dense { gap: 6px; }
+.q-body.dense .choice { min-height: 50px; padding: 6px 14px; }
 
 /* 数字：大きな数字ボタン（端末のキーボードは出さない） */
 .num-display {

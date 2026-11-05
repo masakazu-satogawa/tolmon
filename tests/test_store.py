@@ -5,7 +5,7 @@ import unittest
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 sys.path.insert(0, ROOT)
-from app import definitions, karte, store  # noqa: E402
+from app import definitions, karte, store, yamlmini  # noqa: E402
 
 DEF = definitions.load_file(os.path.join(ROOT, "definitions", "sample_naika.yaml"))
 REQ = {"symptom": {"value": ["熱がある"]}}  # 必須の設問
@@ -49,11 +49,23 @@ class CleanTest(unittest.TestCase):
 
 
 class ConditionCheckTest(unittest.TestCase):
+    def test_any_condition(self):
+        # any：どれか1つでも満たせば出す（答えていなければ出さない）
+        cond = {"any": [{"q": "onset", "eq": "今日から"}, {"q": "onset", "eq": "昨日から"}]}
+        self.assertTrue(karte.check_condition(cond, {"onset": {"value": "昨日から"}}))
+        self.assertFalse(karte.check_condition(cond, {"onset": {"value": "1年以上前から"}}))
+        self.assertFalse(karte.check_condition(cond, {}))
+        d = {"id": "x", "title": "x", "questions": [
+            {"id": "onset", "type": "single", "text": "t", "karte": "k", "options": [{"label": "今日から"}, {"label": "昨日から"}]},
+            {"id": "q", "type": "text", "text": "t", "karte": "k", "show_if": cond}]}
+        definitions.validate(d)
+        self.assertEqual(yamlmini.load(yamlmini.dump(d)), d)
+
     def test_bad_conditions_rejected(self):
         base = {"id": "x", "title": "x", "questions": [
             {"id": "age", "type": "number", "text": "年齢", "karte": "年齢"},
             {"id": "q", "type": "text", "text": "t", "karte": "k"}]}
-        for cond in ({"q": "age", "lt": "50"}, {"q": "nope", "eq": "a"}, {"q": "age"}, {"all": []}):
+        for cond in ({"q": "age", "lt": "50"}, {"q": "nope", "eq": "a"}, {"q": "age"}, {"all": []}, {"any": []}):
             with self.subTest(cond=cond):
                 d = {**base, "questions": [base["questions"][0], dict(base["questions"][1], show_if=cond)]}
                 with self.assertRaises(definitions.DefinitionError):
