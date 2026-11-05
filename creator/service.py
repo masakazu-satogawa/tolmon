@@ -12,10 +12,10 @@ from app import definitions, karte, store, yamlmini
 from . import claude_api, reader
 
 _FORM_ID = re.compile(r"^[a-z][a-z0-9_]{1,30}$")
-_last = {}                      # 直近の読み取り結果（画面を開き直しても消えないように覚えておく）
+_drafts = {}                    # 読み取った下書き。問診ID → 結果（画面を開き直しても、起動し直しても消えない）
 _trial = {}                     # 公開前に患者さんの画面で試す定義（覚えるだけ。保存しない）
 _lock = threading.Lock()
-_draft_file = None              # 直近の読み取り結果を置くファイル（use_draft_dir で決まる）
+_draft_dir = None               # 下書きを置くフォルダ（use_draft_dir で決まる）
 
 
 class ServiceError(ValueError):
@@ -43,45 +43,70 @@ def read(body, model=claude_api.DEFAULT_MODEL):
         raise ServiceError(str(e)) from e
     result["form_id"] = form_id
     result["source_name"] = name
+    result["saved_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     with _lock:
-        _last.clear()
-        _last.update(result)
+        _drafts[form_id] = result
         _write_draft(result)
     return result
 
 
 def use_draft_dir(path):
-    """下書きの置き場所を決める。サーバーを起動し直しても、直前の読み取り結果を戻せるようにする。
+    """下書きの置き場所を決めて、置いてある下書きを読み込む（問診票ごとに1ファイル）。
     置くのは白紙の帳票から作った設問の下書きだけ（患者さんの回答は入らない）。"""
-    global _draft_file
-    _draft_file = os.path.join(path, "creator_last.json")
-    try:
-        with open(_draft_file, encoding="utf-8") as f:
-            saved = json.load(f)
-    except (OSError, ValueError):
-        return
-    if isinstance(saved, dict):
-        with _lock:
-            _last.clear()
-            _last.update(saved)
+    global _draft_dir
+    _draft_dir = os.path.join(path, "creator_drafts")
+    found = {}
+    names = sorted(os.listdir(_draft_dir)) if os.path.isdir(_draft_dir) else []
+    files = [os.path.join(_draft_dir, n) for n in names if n.endswith(".json")]
+    old = os.path.join(path, "creator_last.json")       # 以前の置き方（1件だけ）。あれば引き継ぐ
+    for f in files + [old]:
+        try:
+            with open(f, encoding="utf-8") as fh:
+                saved = json.load(fh)
+        except (OSError, ValueError):
+            continue                                    # 壊れた下書きは読まない（起動は止めない）
+        if isinstance(saved, dict) and _FORM_ID.match(str(saved.get("form_id", ""))):
+            if not saved.get("saved_at"):               # 日時のない古い下書きは、ファイルの日時を使う
+                saved["saved_at"] = datetime.fromtimestamp(os.path.getmtime(f)).strftime("%Y-%m-%d %H:%M:%S")
+            found.setdefault(saved["form_id"], saved)
+    with _lock:
+        _drafts.clear()
+        _drafts.update(found)
+        if os.path.exists(old) and all(_write_draft(d) for d in found.values()):
+            os.remove(old)
 
 
 def _write_draft(result):
-    if not _draft_file:
-        return
+    if not _draft_dir:
+        return True
     try:
-        os.makedirs(os.path.dirname(_draft_file), exist_ok=True)
-        tmp = _draft_file + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
+        os.makedirs(_draft_dir, exist_ok=True)
+        path = os.path.join(_draft_dir, result["form_id"] + ".json")
+        with open(path + ".tmp", "w", encoding="utf-8") as f:
             json.dump(result, f, ensure_ascii=False)
-        os.replace(tmp, _draft_file)
+        os.replace(path + ".tmp", path)
+        return True
     except OSError:
-        pass                    # 覚えておけなくても、読み取り結果そのものは返す
+        return False            # 置けなくても、読み取り結果そのものは返す
 
 
-def last():
+def drafts():
+    """読み取った下書きの一覧（新しい順）。"""
     with _lock:
-        return dict(_last)
+        rows = [{"form_id": k, "title": (d.get("definition") or {}).get("title", ""),
+                 "count": len((d.get("definition") or {}).get("questions", [])),
+                 "source_name": d.get("source_name", ""), "saved_at": d.get("saved_at", "")}
+                for k, d in _drafts.items()]
+    return sorted(rows, key=lambda r: r["saved_at"], reverse=True)
+
+
+def last(form_id=None):
+    """下書きを1つ返す。問診IDがなければ、いちばん新しいもの。"""
+    with _lock:
+        if form_id:
+            return dict(_drafts.get(form_id) or {})
+        newest = max(_drafts.values(), key=lambda d: d.get("saved_at", ""), default={})
+        return dict(newest)
 
 
 def check_yaml(body):

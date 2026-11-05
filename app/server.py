@@ -125,7 +125,9 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/creator/info":
                 return self._json(app.creator.info())
             if path == "/api/creator/last":
-                return self._json(app.creator.last())
+                return self._json(app.creator.last(qs.get("form_id")))
+            if path == "/api/creator/drafts":
+                return self._json({"drafts": app.creator.drafts()})
             if path == "/api/creator/trial":
                 try:
                     return self._json(app.creator.trial())

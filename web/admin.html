@@ -36,6 +36,11 @@
   </div>
   <p class="a-safe">Claude に送るのは、この白紙の帳票だけです。患者さんの回答は送りません。</p>
   <p id="read-msg" class="a-msg" hidden></p>
+  <!-- 読み取り済みの下書き。押すと、読み取り直さずにその結果を開く -->
+  <div id="drafts" class="a-drafts" hidden>
+    <span class="a-drafts-label">読み取り済みの下書き（押すと開きます）</span>
+    <div id="draft-list" class="a-draft-list"></div>
+  </div>
 </section>
 
 <div id="work" class="a-work" hidden>

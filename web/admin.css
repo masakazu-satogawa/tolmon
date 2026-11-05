@@ -44,6 +44,13 @@ body.admin { font-size: 15px; background: var(--bg); overflow: visible; }
 .a-msg.ng { background: var(--warn-soft); color: var(--warn); }
 .a-msg a { color: var(--accent); }
 
+.a-drafts { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.a-drafts-label { color: var(--muted); font-size: .85rem; }
+.a-draft-list { display: flex; gap: 8px; flex-wrap: wrap; }
+.a-draft-list button { border: 1px solid var(--line); background: var(--card); border-radius: 8px; padding: 6px 12px; cursor: pointer; text-align: left; font-weight: 700; }
+.a-draft-list button small { display: block; font-weight: 400; color: var(--muted); font-size: .75rem; }
+.a-draft-list button[aria-pressed="true"] { border: 2px solid var(--accent); background: var(--accent-soft); padding: 5px 11px; }
+
 .a-work { display: grid; grid-template-columns: minmax(320px, 2fr) 3fr; gap: 16px; padding: 0 24px 40px; align-items: start; }
 .a-paper { position: sticky; top: 12px; }
 .a-paper h2 { font-size: .95rem; margin: 0 0 6px; color: var(--muted); }

@@ -96,23 +96,30 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual(shown["allergy"], "ある")                   # 患者さんが選んだ言葉はそのまま
         self.assertEqual(shown["memo"], "診察のときに話します")
 
-    def test_last_survives_restart(self):
-        # サーバーを起動し直しても、直前の読み取り結果を戻せる
-        old_file, old_last = service._draft_file, dict(service._last)
+    def test_drafts_survive_restart(self):
+        # 下書きは問診票ごとに残り、サーバーを起動し直しても戻せる
+        old_dir, old_drafts = service._draft_dir, dict(service._drafts)
         try:
             with tempfile.TemporaryDirectory() as d:
                 service.use_draft_dir(d)
-                service._write_draft({"form_id": "test_form", "definition": {"title": "テスト問診票"}})
-                service._last.clear()                       # 起動し直したのと同じ状態
-                service.use_draft_dir(d)
-                self.assertEqual(service.last()["definition"]["title"], "テスト問診票")
+                for fid, title, at in (("seikei", "整形外科", "2026-11-05 10:00:00"), ("naika", "内科", "2026-11-05 11:00:00")):
+                    service._write_draft({"form_id": fid, "saved_at": at, "definition": {"title": title, "questions": [{}]}})
+                with open(os.path.join(d, "creator_drafts", "broken.json"), "w", encoding="utf-8") as f:
+                    f.write("{こわれている")                  # 壊れていても起動は止めない
                 with open(os.path.join(d, "creator_last.json"), "w", encoding="utf-8") as f:
-                    f.write("{こわれている")
-                service.use_draft_dir(d)                    # 壊れていても起動は止めない
+                    f.write('{"form_id": "jibi", "saved_at": "2026-11-04 09:00:00", "definition": {"title": "耳鼻科", "questions": []}}')
+                service._drafts.clear()                     # 起動し直したのと同じ状態
+                service.use_draft_dir(d)
+                self.assertEqual([r["form_id"] for r in service.drafts()], ["naika", "seikei", "jibi"])   # 新しい順
+                self.assertEqual(service.last()["definition"]["title"], "内科")
+                self.assertEqual(service.last("seikei")["definition"]["title"], "整形外科")
+                self.assertEqual(service.last("none"), {})
+                self.assertFalse(os.path.exists(os.path.join(d, "creator_last.json")))   # 以前の置き方は引き継いで片づける
+                self.assertTrue(os.path.exists(os.path.join(d, "creator_drafts", "jibi.json")))
         finally:
-            service._draft_file = old_file
-            service._last.clear()
-            service._last.update(old_last)
+            service._draft_dir = old_dir
+            service._drafts.clear()
+            service._drafts.update(old_drafts)
 
     def test_read_rejects_bad_input(self):
         for body in ({"form_id": "Bad ID", "name": "a.pdf", "data": "AAAA"},

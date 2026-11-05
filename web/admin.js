@@ -38,6 +38,7 @@ var A = {
   issues: [],         // Claude の見直し
   sources: {},        // 設問id → もとになった紙の文言
   added: {},          // 設問id → 紙にない選択肢（Claude が足したもの）の一覧
+  formId: "",         // いま開いている下書きの問診ID
   paperUrl: null
 };
 var TYPE_NAMES = { text: "自由記入", single: "1つ選ぶ", multi: "いくつでも選ぶ", number: "数字", time: "時刻", body: "体の図" };
@@ -135,7 +136,10 @@ function showResult(r) {
   A.added = r.added || {};
   $("work").hidden = false;
   $("yaml").value = r.yaml;
-  if (r.form_id && !$("form-id").value) $("form-id").value = r.form_id;
+  if (r.form_id) $("form-id").value = r.form_id;
+  A.formId = r.form_id || "";
+  updateReadButton();
+  loadDrafts();
   renderProblems(r.problems || []);
   renderQuestions();
   renderIssues(r.summary || "", r.notes || []);
@@ -332,6 +336,33 @@ $("btn-save").addEventListener("click", function () {
   checkYaml().then(function (r) { if (r.ok) save(false); else { $("save-msg").hidden = false; $("save-msg").className = "a-msg ng"; $("save-msg").textContent = "直すところがあります（上の赤い枠）"; } });
 });
 
+// ---------------------------------------------------------------- 読み取り済みの下書き（問診票ごとに残る）
+function showDraft(d) {
+  showResult(d);
+  $("read-msg").hidden = false;
+  $("read-msg").className = "a-msg";
+  $("read-msg").textContent = "「" + d.definition.title + "」の下書き（" + (d.source_name || "") + "）を表示しています。紙と並べて見るには、同じファイルを選び直してください。読み取り直す必要はありません。";
+}
+function loadDrafts() {
+  return api("/api/creator/drafts").then(function (res) {
+    var list = $("draft-list");
+    clear(list);
+    $("drafts").hidden = !res.drafts.length;
+    res.drafts.forEach(function (d) {
+      var b = el("button", { type: "button", "aria-pressed": String(d.form_id === A.formId) },
+        d.title + "（" + d.count + "問）", el("small", {}, d.form_id + " ／ " + d.source_name + " ／ " + d.saved_at.slice(5, 16)));
+      b.addEventListener("click", function () {
+        api("/api/creator/last?form_id=" + encodeURIComponent(d.form_id)).then(showDraft).catch(function (e) {
+          $("read-msg").hidden = false;
+          $("read-msg").className = "a-msg ng";
+          $("read-msg").textContent = e.message;
+        });
+      });
+      list.appendChild(b);
+    });
+  }).catch(function () {});
+}
+
 // ---------------------------------------------------------------- 開始
 api("/api/creator/info").then(function (info) {
   $("rules").textContent = info.rules;
@@ -339,12 +370,9 @@ api("/api/creator/info").then(function (info) {
   if (!info.has_key) $("a-env").className = "a-env ng";
   return api("/api/creator/last");
 }).then(function (last) {
-  // 画面を開き直しても、直前の読み取り結果を戻す（紙の表示だけは選び直しが必要）
-  if (last && last.definition) {
-    showResult(last);
-    $("read-msg").hidden = false;
-    $("read-msg").textContent = "直前に読み取った結果（" + (last.source_name || "") + "）を表示しています。紙と並べて見るには、同じファイルを選び直してください。";
-  }
+  // 画面を開き直しても、いちばん新しい下書きを戻す（紙の表示だけは選び直しが必要）
+  if (last && last.definition) showDraft(last);
+  else loadDrafts();
 }).catch(function (e) {
   $("a-env").className = "a-env ng";
   $("a-env").textContent = e.message;
