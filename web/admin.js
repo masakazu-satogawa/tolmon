@@ -201,7 +201,7 @@ function renderQuestions() {
         "点線の " + nAdded + " 個は紙にない選択肢です（紙の書く欄を、選ぶ形に変えました）。この内容でよいか確かめてください。"));
     }
     if (q.type === "number") li.appendChild(el("p", { "class": "q-hint" }, "画面の大きな数字ボタンで入力します（キーボードは出ません）。"));
-    if (q.type === "text") li.appendChild(el("p", { "class": "q-hint" }, "書く欄です。「書かずに、診察のときに話します」ボタンも出ます（カルテには「口頭で確認」）。"));
+    if (q.type === "text") li.appendChild(el("p", { "class": "q-hint" }, "書く欄です。「書かずに、診察のときに話します」ボタンも出ます（カルテには「記載がないので要聴取」）。"));
     if (q.type === "body" && window.TolmonBody) {
       // 患者さんがタップする図の見本（男性の図。性別の回答で女性の図に変わる）
       var figs = el("div", { "class": "q-figs" });

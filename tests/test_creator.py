@@ -87,11 +87,11 @@ class ServiceTest(unittest.TestCase):
         self.assertNotIn("妊娠", res["karte"])
         with self.assertRaises(service.ServiceError):
             service.trial_karte({"answers": {}})                     # 必須（allergy）が未回答
-        # 書かせない：記入欄を書かなかった・書く欄で「診察のときに話します」を選んだ → カルテに「口頭で確認」
+        # 書かせない：記入欄を書かなかった・書く欄で「診察のときに話します」を選んだ → カルテに「記載がないので要聴取」
         res = service.trial_karte({"answers": {"sex": {"value": "男性"}, "allergy": {"value": "ある"},
                                                "memo": {"talk": True}}})
-        self.assertIn("あり（口頭で確認）", res["karte"])
-        self.assertIn("項目：口頭で確認", res["karte"])
+        self.assertIn("あり（記載がないので要聴取）", res["karte"])
+        self.assertIn("項目：記載がないので要聴取", res["karte"])
         shown = {s["id"]: s["answer"] for s in res["shown"]}
         self.assertEqual(shown["allergy"], "ある")                   # 患者さんが選んだ言葉はそのまま
         self.assertEqual(shown["memo"], "診察のときに話します")

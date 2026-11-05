@@ -6,7 +6,7 @@ from .definitions import TAGS
 MAIN_SUFFIX = "（いちばんつらい）"
 # 患者さんに文字を書かせない：書く欄は「診察のときに話します」で先へ進める。カルテには聞くべきことが分かるよう残す
 TALK_PATIENT = "診察のときに話します"
-TALK_KARTE = "口頭で確認"
+TALK_KARTE = "記載がないので要聴取"
 
 
 def _num(v):
