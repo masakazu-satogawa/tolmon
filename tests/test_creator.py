@@ -70,6 +70,24 @@ class ServiceTest(unittest.TestCase):
             with self.assertRaises(service.ServiceError):
                 service.save({"yaml": text.replace('"ある"', '"あ"', 1)}, d)
 
+    def test_trial(self):
+        # 公開前のお試し：定義を覚えて、回答がカルテにどう出るかを返す（保存はしない）
+        text = reader.to_yaml(reader.to_definition(DRAFT, "test_form"))
+        with self.assertRaises(service.ServiceError):
+            service.set_trial({"yaml": "a: |\n  x"})
+        self.assertEqual(service.set_trial({"yaml": text})["title"], "テスト問診票")
+        self.assertEqual(service.trial()["id"], "test_form")
+        res = service.trial_karte({"answers": {
+            "sex": {"value": "男性"}, "age": {"value": "70"},
+            "allergy": {"value": "ある", "details": {"ある": "ペニシリン"}},
+            "pregnancy": {"value": "妊娠中"},                       # 男性には出ない設問 → 捨てる
+            "site": {"value": ["r_foot", "l_shoulder"], "main": "r_foot"}}})
+        self.assertIn("ペニシリン", res["karte"])
+        self.assertIn("右足（いちばんつらい）", res["karte"])
+        self.assertNotIn("妊娠", res["karte"])
+        with self.assertRaises(service.ServiceError):
+            service.trial_karte({"answers": {}})                     # 必須（allergy）が未回答
+
     def test_last_survives_restart(self):
         # サーバーを起動し直しても、直前の読み取り結果を戻せる
         old_file, old_last = service._draft_file, dict(service._last)

@@ -41,6 +41,30 @@ var A = {
 };
 var TYPE_NAMES = { text: "自由記入", single: "1つ選ぶ", multi: "いくつでも選ぶ", number: "数字", time: "時刻", body: "体の図" };
 
+// ---------------------------------------------------------------- 手順（いま何をするところか）
+var NEXT_TEXT = {
+  2: "次にやること：右の設問を、左の紙と見比べてください。よければ「患者さんの画面で試す」へ。",
+  3: "次にやること：開いた画面で、患者さんと同じように最後まで答えてみてください。",
+  4: "次にやること：問題なければ「確定して公開」。受付の画面に診療科のボタンが出ます。",
+  5: "公開しました。問診票を直したくなったら、この画面でやり直せます。"
+};
+function setStep(n) {
+  A.step = n;
+  var items = document.querySelectorAll("#steps li");
+  for (var i = 0; i < items.length; i++) {
+    var s = Number(items[i].getAttribute("data-step"));
+    items[i].className = s < n ? "done" : s === n ? "now" : "";
+  }
+  $("next-text").textContent = NEXT_TEXT[n] || "";
+  // いま押すボタンを目立たせる
+  $("btn-try").className = "a-btn" + (n <= 3 ? " primary" : "");
+  $("btn-save").className = "a-btn" + (n === 4 ? " primary" : "");
+}
+function nowText() {
+  var d = new Date();
+  return d.getHours() + ":" + (d.getMinutes() < 10 ? "0" : "") + d.getMinutes();
+}
+
 // ---------------------------------------------------------------- 入力
 function updateReadButton() {
   $("btn-read").disabled = !($("file").files.length && /^[a-z][a-z0-9_]{1,30}$/.test($("form-id").value.trim()));
@@ -91,8 +115,8 @@ $("btn-read").addEventListener("click", function () {
   readAsBase64(file).then(function (b64) {
     return api("/api/creator/read", { name: file.name, form_id: $("form-id").value.trim(), data: b64 });
   }).then(function (r) {
-    msg.textContent = "読み取りました。右の内容を紙と見比べて、違うところを直してください。";
     showResult(r);
+    msg.textContent = "読み取りました（" + nowText() + "）。設問は " + r.definition.questions.length + " 問です。下の右側が、Claude が紙から作った設問です。";
   }).catch(function (e) {
     msg.className = "a-msg ng";
     msg.textContent = e.message;
@@ -121,6 +145,7 @@ function showResult(r) {
   if (u.read) parts.push("モデル " + u.read.model);
   $("usage").textContent = parts.join(" ／ ");
   $("save-msg").hidden = true;
+  setStep(2);
 }
 
 function renderProblems(list) {
@@ -165,6 +190,18 @@ function renderQuestions() {
           o.detail ? el("span", { "class": "d" }, "選ぶと記入欄：" + o.detail) : null));
       });
       li.appendChild(ul);
+    }
+    if (q.type === "body" && window.TolmonBody) {
+      // 患者さんがタップする図の見本（男性の図。性別の回答で女性の図に変わる）
+      var figs = el("div", { "class": "q-figs" });
+      TolmonBody.views.forEach(function (v) {
+        if (q.views && q.views.indexOf(v.id) < 0) return;
+        var box = el("div", {});
+        TolmonBody.draw(v.id, box, {}, function () {}, "m");
+        figs.appendChild(el("figure", {}, box, el("figcaption", {}, v.label)));
+      });
+      li.appendChild(figs);
+      li.appendChild(el("p", { "class": "q-hint" }, "患者さんは図をタップして場所を選びます。2か所以上なら「いちばんつらいところ」を1つ選びます。"));
     }
     if (q.show_if) li.appendChild(el("p", { "class": "q-branch" }, "出る条件：" + describeCond(q.show_if)));
     if (q.hint) li.appendChild(el("p", { "class": "q-hint" }, "ヒント：" + q.hint));
@@ -252,13 +289,34 @@ function save(overwrite) {
     }
     msg.className = "a-msg";
     clear(msg);
-    msg.appendChild(document.createTextNode("「" + r.title + "」を確定して公開しました（" + r.file + "）。 "));
-    msg.appendChild(el("a", { href: "/", target: "_blank" }, "タブレットの画面で試す"));
+    msg.appendChild(document.createTextNode("受付の画面に「" + r.title + "」のボタンが出ました。 "));
+    msg.appendChild(el("a", { href: "/", target: "_blank" }, "受付の画面を開く"));
+    setStep(5);
   }).catch(function (e) {
     msg.className = "a-msg ng";
     msg.textContent = e.message;
   });
 }
+// 公開する前に、患者さんの画面（タブレットと同じ画面）で最後まで試す。回答は保存されない
+$("btn-try").addEventListener("click", function () {
+  var msg = $("save-msg");
+  // 押した瞬間にタブを開いておく（あとから開くと、ブラウザに止められることがある）
+  var w = window.open("about:blank", "tolmon_trial");
+  checkYaml().then(function (r) {
+    if (!r.ok) throw new Error("直すところがあります（赤い枠）。直してから試してください。");
+    return api("/api/creator/trial", { yaml: $("yaml").value });
+  }).then(function () {
+    if (w) w.location.href = "/?try=1"; else window.location.href = "/?try=1";
+    msg.hidden = true;
+    setStep(4);
+  }).catch(function (e) {
+    if (w) w.close();
+    msg.hidden = false;
+    msg.className = "a-msg ng";
+    msg.textContent = e.message;
+  });
+});
+
 $("btn-save").addEventListener("click", function () {
   checkYaml().then(function (r) { if (r.ok) save(false); else { $("save-msg").hidden = false; $("save-msg").className = "a-msg ng"; $("save-msg").textContent = "直すところがあります（上の赤い枠）"; } });
 });
@@ -280,3 +338,4 @@ api("/api/creator/info").then(function (info) {
   $("a-env").className = "a-env ng";
   $("a-env").textContent = e.message;
 });
+setStep(1);

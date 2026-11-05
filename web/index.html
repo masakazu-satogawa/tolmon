@@ -18,6 +18,7 @@
     <button type="button" data-fs="m">中</button>
     <button type="button" data-fs="l">大</button>
   </div>
+  <span id="trial-badge" class="trial-badge" hidden>お試し中（回答は保存されません）</span>
   <button id="btn-abort" class="abort" type="button">最初に戻る</button>
 </div>
 
@@ -96,6 +97,21 @@
     <footer class="nav">
       <button id="btn-reg-later" class="btn" type="button">あとで登録</button>
       <button id="btn-reg-check" class="btn primary" type="button" disabled>確認へ進む</button>
+    </footer>
+  </section>
+
+  <!-- お試し（作る画面から）：送ったあと、カルテにどう出るかを見せる。回答は保存しない -->
+  <section id="s-trial" class="screen" hidden>
+    <header class="staff-head">
+      <span class="badge">お試し</span>
+      <h1>お試しはここまでです</h1>
+    </header>
+    <p class="sub">本番では、ここで受付番号が出ます。いまの回答は保存していません。</p>
+    <h2 class="trial-h">医師・看護師の画面には、こう出ます（カルテに貼り付ける文）</h2>
+    <pre id="trial-karte" class="trial-karte"></pre>
+    <footer class="nav">
+      <button id="btn-trial-again" class="btn" type="button">もう一度ためす</button>
+      <button id="btn-trial-close" class="btn primary" type="button">作る画面にもどる</button>
     </footer>
   </section>
 

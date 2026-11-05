@@ -126,6 +126,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(app.creator.info())
             if path == "/api/creator/last":
                 return self._json(app.creator.last())
+            if path == "/api/creator/trial":
+                try:
+                    return self._json(app.creator.trial())
+                except app.creator.ServiceError as e:
+                    return self._error(404, str(e))
             return self._error(404, "ページがありません")
         if path.startswith("/static/"):
             return self._static(path[len("/static/"):])
@@ -174,6 +179,10 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json(app.creator.read(body))
                 if path == "/api/creator/check":
                     return self._json(app.creator.check_yaml(body))
+                if path == "/api/creator/trial":
+                    return self._json(app.creator.set_trial(body))
+                if path == "/api/creator/trial/karte":
+                    return self._json(app.creator.trial_karte(body))
                 if path == "/api/creator/save":
                     res = app.creator.save(body, app.def_dirs[0])
                     if res.get("ok"):

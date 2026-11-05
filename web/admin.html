@@ -11,10 +11,18 @@
 <header class="a-head">
   <div>
     <h1>問診票をつくる</h1>
-    <p class="a-lead">白紙の問診票を選ぶと、Claude が読み取って Web問診の下書きを作ります。<b>読み取りはAI、確定は人。</b></p>
+    <p class="a-lead">紙の問診票から、受付の画面に出す診療科のボタン（Web問診）を1つ作ります。<b>読み取りはAI、確定は人。</b></p>
   </div>
   <p id="a-env" class="a-env"></p>
 </header>
+
+<!-- この画面の使い方。いまの手順に色がつく -->
+<ol id="steps" class="a-steps">
+  <li data-step="1"><b>紙を選んで「読み取る」</b><span>Claude が紙の設問を読み取ります（1〜2分）</span></li>
+  <li data-step="2"><b>紙と見比べて直す</b><span>右の設問が、紙と同じか確かめます</span></li>
+  <li data-step="3"><b>患者さんの画面で試す</b><span>タブレットと同じ画面で、最後まで答えてみます</span></li>
+  <li data-step="4"><b>確定して公開</b><span>受付の画面に、診療科のボタンが出ます</span></li>
+</ol>
 
 <section class="a-step">
   <div class="a-form">
@@ -37,6 +45,16 @@
   </aside>
 
   <section class="a-result">
+    <!-- 次にやること。下までスクロールしなくても押せるよう、いつも上に出しておく -->
+    <div class="a-next">
+      <p id="next-text" class="a-next-text"></p>
+      <div class="a-next-btns">
+        <button id="btn-try" class="a-btn primary" type="button">患者さんの画面で試す</button>
+        <button id="btn-save" class="a-btn" type="button">確定して公開</button>
+      </div>
+      <p id="save-msg" class="a-msg" hidden></p>
+    </div>
+
     <div class="a-tabs" role="tablist">
       <button type="button" data-tab="questions" aria-pressed="true">設問 <span id="n-questions" class="n"></span></button>
       <button type="button" data-tab="issues">Claudeの見直し <span id="n-issues" class="n"></span></button>
@@ -46,7 +64,10 @@
 
     <div id="problems" class="a-problems" hidden></div>
 
-    <div id="tab-questions" class="a-pane"><ol id="q-list" class="q-cards"></ol></div>
+    <div id="tab-questions" class="a-pane">
+      <p class="sub a-pane-lead">患者さんには、この順に1問ずつ出ます。左の紙と見比べてください。実際の見え方は「患者さんの画面で試す」で確かめられます。</p>
+      <ol id="q-list" class="q-cards"></ol>
+    </div>
     <div id="tab-issues" class="a-pane" hidden>
       <p id="summary" class="a-summary"></p>
       <ul id="issue-list" class="issues"></ul>
@@ -66,12 +87,12 @@
 
     <footer class="a-foot">
       <span id="usage" class="a-usage"></span>
-      <button id="btn-save" class="a-btn primary" type="button">この内容で確定して公開</button>
     </footer>
-    <p id="save-msg" class="a-msg" hidden></p>
   </section>
 </div>
 
+<script src="/static/body-data.js"></script>
+<script src="/static/body.js"></script>
 <script src="/static/admin.js"></script>
 </body>
 </html>

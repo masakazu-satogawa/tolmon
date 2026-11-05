@@ -5,13 +5,15 @@ import json
 import os
 import re
 import threading
+from datetime import datetime
 
-from app import definitions, yamlmini
+from app import definitions, karte, store, yamlmini
 
 from . import claude_api, reader
 
 _FORM_ID = re.compile(r"^[a-z][a-z0-9_]{1,30}$")
 _last = {}                      # 直近の読み取り結果（画面を開き直しても消えないように覚えておく）
+_trial = {}                     # 公開前に患者さんの画面で試す定義（覚えるだけ。保存しない）
 _lock = threading.Lock()
 _draft_file = None              # 直近の読み取り結果を置くファイル（use_draft_dir で決まる）
 
@@ -93,6 +95,35 @@ def check_yaml(body):
         return {"ok": False, "problems": ["YAMLの一番外側は「キー: 値」の形にしてください"], "definition": None}
     probs = reader.problems(defn)
     return {"ok": not probs, "problems": probs, "definition": defn}
+
+
+def set_trial(body):
+    """公開する前に、患者さんの画面で試すための定義を覚える（保存も公開もしない）。"""
+    res = check_yaml(body)
+    if not res["ok"]:
+        raise ServiceError("直してから試してください：\n" + "\n".join(res["problems"]))
+    with _lock:
+        _trial.clear()
+        _trial.update(res["definition"])
+    return {"ok": True, "title": res["definition"].get("title", "")}
+
+
+def trial():
+    with _lock:
+        if not _trial:
+            raise ServiceError("お試しの問診票がありません。作る画面で「患者さんの画面で試す」を押してください")
+        return dict(_trial)
+
+
+def trial_karte(body):
+    """お試しの回答が、カルテにどう出るかを返す。回答はどこにも保存しない。"""
+    defn = trial()
+    try:
+        answers = store.clean_answers(defn, body.get("answers"))
+    except store.AnswerError as e:
+        raise ServiceError(str(e)) from e
+    return {"karte": karte.karte_text(defn, answers, datetime.now().strftime("%Y/%m/%d %H:%M")),
+            "shown": karte.shown_questions(defn, answers)}
 
 
 def save(body, def_dir):

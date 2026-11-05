@@ -82,7 +82,9 @@ function setFontSize(size) {
 })();
 
 // ---------------------------------------------------------------- 画面切り替え
-var SCREENS = ["reception", "welcome", "question", "review", "number", "register", "done"];
+var SCREENS = ["reception", "welcome", "question", "review", "number", "register", "done", "trial"];
+// お試し（作る画面の「患者さんの画面で試す」から開く）。公開前の問診票を、保存せずに最後まで試す
+var TRIAL = /[?&]try=1(&|$)/.test(window.location.search);
 var PATIENT_SCREENS = ["welcome", "question", "review"];
 function show(name) {
   SCREENS.forEach(function (s) { $("s-" + s).hidden = s !== name; });
@@ -117,16 +119,29 @@ function initReception() {
   });
 }
 
+function beginForm(form) {
+  S.form = form;
+  S.answers = {};
+  S.startedAt = localIso(new Date());
+  $("welcome-count").textContent = "質問はおよそ " + visibleQuestions().length + " 問です。";
+  setFontSize("m");
+  touch();
+  show("welcome");
+}
 function startForm(id) {
-  api("/api/forms/" + encodeURIComponent(id)).then(function (form) {
-    S.form = form;
-    S.answers = {};
-    S.startedAt = localIso(new Date());
-    $("welcome-count").textContent = "質問はおよそ " + visibleQuestions().length + " 問です。";
-    setFontSize("m");
-    touch();
-    show("welcome");
-  }).catch(function (e) { alert(e.message); });
+  api("/api/forms/" + encodeURIComponent(id)).then(beginForm).catch(function (e) { alert(e.message); });
+}
+
+// お試し：受付の画面は通らず、作る画面で確認中の問診票をそのまま始める
+function startTrial() {
+  $("trial-badge").hidden = false;
+  return api("/api/config").then(function (cfg) {
+    S.cfg = cfg;
+    return api("/api/body");
+  }).then(function (b) {
+    S.bodyLabels = b.regions;
+    return api("/api/creator/trial");
+  }).then(beginForm);
 }
 
 // ---------------------------------------------------------------- 設問の表示条件（app/karte.py の check_condition と同じ考え方）
@@ -429,14 +444,22 @@ $("btn-submit").addEventListener("click", function () {
   // 表示されていない設問の回答は送らない
   var answers = {};
   visibleQuestions().forEach(function (q) { if (hasAnswer(q)) answers[q.id] = S.answers[q.id]; });
-  post("/api/answers", { form_id: S.form.id, form_hash: S.form._hash, answers: answers, started_at: S.startedAt })
+  var sending = TRIAL
+    // お試し：保存はしない。カルテにどう出るかだけ受け取って見せる
+    ? post("/api/creator/trial/karte", { answers: answers }).then(function (res) {
+      S.answers = {};
+      $("trial-karte").textContent = res.karte;
+      show("trial");
+    })
+    : post("/api/answers", { form_id: S.form.id, form_hash: S.form._hash, answers: answers, started_at: S.startedAt })
     .then(function (res) {
       // 送った時点でサーバーに保存済み。タブレットには受付番号だけを出す（回答の中身は消す）
       S.pending = { record_id: res.record_id, number: res.number, title: S.form.title };
       S.answers = {};
       $("number").textContent = res.number;
       show("number");
-    })
+    });
+  sending
     .catch(function (e) {
       $("submit-msg").textContent = e.message + "\n係の者をお呼びください。";
       $("submit-msg").hidden = false;
@@ -513,8 +536,16 @@ function resetAll() {
   $("pcode").value = "";
   ["dlg-confirm", "dlg-idle", "dlg-abort"].forEach(function (d) { $(d).hidden = true; });
   setFontSize("m");
+  if (TRIAL) return startTrial().catch(trialFailed);   // お試しは受付の画面に戻らず、はじめからやり直す
   show("reception");
 }
+
+function trialFailed(e) { document.body.textContent = e.message; }
+$("btn-trial-again").addEventListener("click", resetAll);
+$("btn-trial-close").addEventListener("click", function () {
+  window.close();                                // 作る画面から開いたタブなら閉じる
+  window.location.href = "/admin";               // 閉じられなかったときは作る画面へ
+});
 
 $("btn-abort").addEventListener("click", function () { $("dlg-abort").hidden = false; });
 $("btn-abort-no").addEventListener("click", function () { $("dlg-abort").hidden = true; touch(); });
@@ -548,6 +579,10 @@ setInterval(function () {
 }, 1000);
 
 // ---------------------------------------------------------------- 開始
-initReception().then(function () { show("reception"); }).catch(function (e) {
-  document.body.textContent = "問診サーバーにつながりません：" + e.message;
-});
+if (TRIAL) {
+  startTrial().catch(trialFailed);
+} else {
+  initReception().then(function () { show("reception"); }).catch(function (e) {
+    document.body.textContent = "問診サーバーにつながりません：" + e.message;
+  });
+}

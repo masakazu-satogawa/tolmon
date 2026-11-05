@@ -1,10 +1,34 @@
 /* 作る画面（情報系PCで使う）。PCの画面向け */
-body.admin { font-size: 15px; background: var(--bg); }
+/* overflow は visible に戻す（style.css の指定のままだと、紙と「次にやること」が上に張り付かない） */
+body.admin { font-size: 15px; background: var(--bg); overflow: visible; }
 .a-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; padding: 16px 24px 8px; flex-wrap: wrap; }
 .a-head h1 { font-size: 1.5rem; }
 .a-lead { margin: 2px 0 0; color: var(--muted); }
 .a-env { margin: 0; color: var(--muted); font-size: .8rem; text-align: right; }
 .a-env.ng { color: var(--warn); font-weight: 700; }
+
+/* 使い方（4つの手順）。いまの手順に色、済んだ手順にチェック */
+.a-steps { list-style: none; margin: 4px 24px 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; counter-reset: step; }
+.a-steps li { counter-increment: step; position: relative; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px 10px 46px; color: var(--muted); }
+.a-steps li::before { content: counter(step); position: absolute; left: 12px; top: 12px; width: 24px; height: 24px; border-radius: 50%; background: var(--line); color: var(--ink); display: grid; place-items: center; font-weight: 700; font-size: .85rem; }
+.a-steps li b { display: block; color: var(--ink); }
+.a-steps li span { font-size: .8rem; }
+.a-steps li.now { border: 2px solid var(--accent); background: var(--accent-soft); padding: 9px 11px 9px 45px; }
+.a-steps li.now::before { background: var(--accent); color: #fff; }
+.a-steps li.done::before { content: "✓"; background: var(--accent-soft); color: var(--accent); }
+
+/* 次にやること（結果の上にいつも出す） */
+.a-next { position: sticky; top: 0; z-index: 2; background: var(--card); margin: -14px -18px 12px; padding: 14px 18px 12px; border-bottom: 1px solid var(--line); border-radius: 12px 12px 0 0; display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; }
+.a-next-text { margin: 0; font-weight: 700; flex: 1 1 260px; }
+.a-next-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.a-next .a-msg { flex: 1 1 100%; margin: 0; }
+.a-pane-lead { margin: 0 0 10px; font-size: .9rem; }
+
+/* 設問カードの中の体の図（患者さんがタップする図の見本） */
+.q-figs { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 0; }
+.q-figs figure { margin: 0; width: 104px; border: 1px solid var(--line); border-radius: 8px; padding: 6px 6px 4px; background: #fff; text-align: center; }
+.q-figs .body-svg { max-height: 130px; pointer-events: none; }
+.q-figs figcaption { font-size: .75rem; color: var(--muted); margin-top: 2px; }
 
 .a-step { margin: 8px 24px 16px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px; }
 .a-form { display: flex; gap: 18px; align-items: flex-end; flex-wrap: wrap; }
@@ -85,6 +109,7 @@ body.admin { font-size: 15px; background: var(--bg); }
 .a-usage { color: var(--muted); font-size: .8rem; }
 
 @media (max-width: 900px) {
+  .a-steps { grid-template-columns: repeat(2, 1fr); }
   .a-work { grid-template-columns: 1fr; }
   .a-paper { position: static; }
   .a-paper-box { height: 60vh; }
