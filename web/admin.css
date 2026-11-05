@@ -77,6 +77,8 @@ body.admin { font-size: 15px; background: var(--bg); overflow: visible; }
 .q-opts { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; padding: 0; list-style: none; }
 .q-opts li { border: 1px solid var(--line); border-radius: 8px; padding: 3px 10px; font-size: .9rem; position: static; counter-increment: none; }
 .q-opts li::before { content: none; }
+.q-opts li.added { border: 2px dashed #e0a030; background: #fffaf0; }
+.q-added { margin: 8px 0 0; font-size: .85rem; color: #7a4b00; background: #fdf1d8; border-radius: 6px; padding: 4px 10px; }
 .q-opts .k { color: var(--muted); font-size: .8rem; }
 .q-opts .d { display: block; color: var(--accent); font-size: .8rem; }
 .q-branch { margin: 8px 0 0; font-size: .85rem; color: #7a4b00; background: #fdf1d8; border-radius: 6px; padding: 3px 10px; display: inline-block; }

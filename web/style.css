@@ -122,9 +122,33 @@ textarea, .q-input {
 }
 textarea { min-height: 140px; resize: vertical; }
 textarea:focus, .q-input:focus { outline: 3px solid var(--accent); border-color: var(--accent); }
-.number-row { display: flex; align-items: center; gap: 14px; }
-.number-row .q-input { font-size: 2rem; max-width: 260px; text-align: right; }
+.detail-note { margin: 0; color: var(--muted); font-size: .85rem; }
 .unit { font-size: 1.4rem; font-weight: 700; }
+
+/* 選択肢が多いときは2列・3列に並べる（下までスクロールしなくても選べるように） */
+.q-body.cols2, .q-body.cols3 { display: grid; gap: 8px; align-items: stretch; }
+.q-body.cols2 { grid-template-columns: 1fr 1fr; }
+.q-body.cols3 { grid-template-columns: 1fr 1fr 1fr; }
+.q-body.cols2 .choice, .q-body.cols3 .choice { min-height: 58px; padding: 8px 14px; gap: 10px; }
+.q-body.cols2 .choice .mark, .q-body.cols3 .choice .mark { width: 28px; height: 28px; border-width: 2px; font-size: .9rem; }
+.q-body.cols2 .detail, .q-body.cols3 .detail { grid-column: 1 / -1; margin: 0; }
+
+/* 数字：大きな数字ボタン（端末のキーボードは出さない） */
+.num-display {
+  display: flex; align-items: baseline; justify-content: center; gap: 12px; min-height: 3.2rem;
+  border: 2px solid var(--line); border-radius: var(--radius); background: #fff; padding: 6px 16px;
+  width: 100%; max-width: 420px; margin: 0 auto;
+}
+.num-display.empty { border-style: dashed; }
+.num-value { font-size: 2.2rem; line-height: 1.2; font-weight: 800; font-variant-numeric: tabular-nums; min-width: 1.5em; text-align: right; }
+.numpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; max-width: 420px; margin: 0 auto; }
+.num-key {
+  min-height: 56px; height: calc(var(--vh) * 8); max-height: 84px; border-radius: var(--radius);
+  border: 2px solid var(--line); background: var(--card); font-size: 1.8rem; font-weight: 700; cursor: pointer;
+}
+.num-key:active { background: var(--accent-soft); border-color: var(--accent); }
+.num-key.del { font-size: .9rem; color: var(--muted); }
+.choice.talk { margin-top: 4px; }
 
 /* 人体シェーマ */
 .body-tabs { display: flex; gap: 8px; flex-wrap: wrap; }

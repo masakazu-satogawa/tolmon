@@ -115,6 +115,9 @@ def clean_answers(defn, raw):
         else:  # text / time
             v = str(v)[:2000] if v not in (None, "") else None
             chosen = []
+            if v is None and t == "text" and a.get("talk") is True:
+                answers[q["id"]] = {"talk": True}       # 書くかわりに「診察のときに話します」を選んだ
+                continue
         if q.get("required") and (v in (None, "") or v == []):
             raise AnswerError(f"「{q['text']}」は必ず答えてください")
         kept = {o: str(details[o])[:1000] for o in chosen if details.get(o)}

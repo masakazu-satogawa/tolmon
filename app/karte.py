@@ -4,6 +4,9 @@ from . import body
 from .definitions import TAGS
 
 MAIN_SUFFIX = "（いちばんつらい）"
+# 患者さんに文字を書かせない：書く欄は「診察のときに話します」で先へ進める。カルテには聞くべきことが分かるよう残す
+TALK_PATIENT = "診察のときに話します"
+TALK_KARTE = "口頭で確認"
 
 
 def _num(v):
@@ -63,12 +66,14 @@ def karte_value(q, a):
             o = _option(q, label) or {}
             s = o.get("karte") or label
             d = (details.get(label) or "").strip()
+            if not d and o.get("detail"):
+                d = TALK_KARTE          # 記入欄のある選択肢を選んだが、書いていない → 医師が聞く
             parts.append(f"{s}（{d}）" if d else s)
         return "、".join(parts)
     if t == "body":
         return "、".join(body.label(x) for x in v) if isinstance(v, list) and v else None
     if v is None or str(v).strip() == "":
-        return None
+        return TALK_KARTE if a.get("talk") else None
     if t == "number":
         return f"{v}{q.get('unit', '')}"
     return str(v).strip()
@@ -106,7 +111,7 @@ def patient_value(q, a):
             out.append(f"{label}（{d}）" if d else label)
         return "、".join(out)
     if v is None or str(v).strip() == "":
-        return "（未回答）"
+        return TALK_PATIENT if a.get("talk") else "（未回答）"
     if q["type"] == "number":
         return f"{v} {q.get('unit', '')}".strip()
     return str(v)

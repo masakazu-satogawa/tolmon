@@ -171,6 +171,7 @@ function indexOfId(qs, id) { for (var i = 0; i < qs.length; i++) if (qs[i].id ==
 function hasAnswer(q) {
   var a = S.answers[q.id];
   if (!a) return false;
+  if (a.talk) return true;   // 書くかわりに「診察のときに話します」を選んだ
   var v = a.value;
   return !(v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0));
 }
@@ -209,6 +210,11 @@ function renderQuestion() {
   if (q.type === "single" || q.type === "multi") {
     var multi = q.type === "multi";
     var chosen = multi ? (a.value || []) : (a.value ? [a.value] : []);
+    // 選択肢が多いときは2列・3列に並べる（言葉が短いときだけ）
+    var longest = 0;
+    q.options.forEach(function (o) { longest = Math.max(longest, o.label.length); });
+    if (q.options.length >= 13 && longest <= 7) body.className += " cols3";
+    else if (q.options.length >= 6 && longest <= 20) body.className += " cols2";
     q.options.forEach(function (o, idx) {
       var on = chosen.indexOf(o.label) >= 0;
       var btn = el("button", { "class": "choice" + (multi ? " multi" : ""), type: "button", "aria-pressed": String(on) },
@@ -224,18 +230,12 @@ function renderQuestion() {
           cur.details = cur.details || {};
           cur.details[o.label] = ta.value;
         });
-        body.appendChild(el("div", { "class": "detail" }, el("label", { "for": id }, o.detail), ta));
+        body.appendChild(el("div", { "class": "detail" }, el("label", { "for": id }, o.detail), ta,
+          el("p", { "class": "detail-note" }, "書かなくてもかまいません。診察のときにお話しください。")));
       }
     });
   } else if (q.type === "number") {
-    var inp = el("input", { "class": "q-input", inputmode: "decimal", autocomplete: "off", "aria-label": q.text });
-    inp.value = a.value != null ? a.value : "";
-    inp.addEventListener("input", function () {
-      var fixed = toHalf(inp.value);
-      if (fixed !== inp.value) inp.value = fixed;
-      setValue(q, inp.value.trim());
-    });
-    body.appendChild(el("div", { "class": "number-row" }, inp, el("span", { "class": "unit" }, q.unit || "")));
+    renderNumber(q, a, body);
   } else if (q.type === "time") {
     var t = el("input", { "class": "q-input", type: "time", "aria-label": q.text });
     t.value = a.value || "";
@@ -243,13 +243,66 @@ function renderQuestion() {
     t.addEventListener("change", function () { setValue(q, t.value); });
     body.appendChild(t);
   } else {
+    // 自由に書く欄。文字を打つのが難しい人のために、「診察のときに話します」で先へ進めるようにする
     var ta2 = el("textarea", { "aria-label": q.text });
     ta2.value = a.value || "";
-    ta2.addEventListener("input", function () { setValue(q, ta2.value); });
+    var talk = el("button", { "class": "choice talk", type: "button", "aria-pressed": String(!!a.talk) },
+      el("span", { "class": "mark" }, "✓"), el("span", {}, "書かずに、診察のときに話します"));
+    ta2.addEventListener("input", function () {
+      setValue(q, ta2.value);
+      talk.setAttribute("aria-pressed", "false");
+    });
+    talk.addEventListener("click", function () {
+      if ((S.answers[q.id] || {}).talk) delete S.answers[q.id];
+      else S.answers[q.id] = { talk: true };
+      renderQuestion();
+    });
     body.appendChild(ta2);
+    body.appendChild(talk);
   }
   updateNext(q);
 }
+
+// ---------------------------------------------------------------- 数字（画面の大きな数字ボタン。端末のキーボードは出さない）
+function numberText(q) {
+  var a = S.answers[q.id];
+  return a && a.value != null ? String(a.value) : "";
+}
+// 小数点を出すか。定義に decimal があればそれに従い、なければ単位で決める（体温・体重・身長）
+function wantsDecimal(q) {
+  return q.decimal !== undefined ? !!q.decimal : /℃|度|kg|ｋｇ|キロ|cm|ｃｍ|センチ/i.test(q.unit || "");
+}
+function renderNumber(q, a, body) {
+  var cur = numberText(q);
+  body.appendChild(el("div", { "class": "num-display" + (cur ? "" : " empty"), "aria-live": "polite" },
+    el("span", { "class": "num-value" }, cur || "　"), el("span", { "class": "unit" }, q.unit || "")));
+  var pad = el("div", { "class": "numpad" });
+  ["1", "2", "3", "4", "5", "6", "7", "8", "9", wantsDecimal(q) ? "." : "", "0", "del"].forEach(function (k) {
+    if (!k) { pad.appendChild(el("span", {})); return; }
+    var b = el("button", { "class": "num-key" + (k === "del" ? " del" : ""), type: "button" }, k === "del" ? "1文字消す" : k);
+    b.addEventListener("click", function () { pressNumber(q, k); });
+    pad.appendChild(b);
+  });
+  body.appendChild(pad);
+}
+function pressNumber(q, k) {
+  var cur = numberText(q);
+  if (k === "del") cur = cur.slice(0, -1);
+  else if (k === ".") { if (cur && cur.indexOf(".") < 0 && wantsDecimal(q)) cur += "."; }
+  else if (cur.length < 6) cur = (cur === "0" ? "" : cur) + k;
+  setValue(q, cur);
+  renderQuestion();
+}
+// パソコンのキーボードでも数字を入れられるようにする（職員が試すとき用）
+document.addEventListener("keydown", function (ev) {
+  if (S.screen !== "question" || !S.form) return;
+  var q = findQ(S.current);
+  if (!q || q.type !== "number") return;
+  var k = /^[0-9]$/.test(ev.key) ? ev.key : ev.key === "." ? "." : ev.key === "Backspace" ? "del" : null;
+  if (!k) return;
+  ev.preventDefault();
+  pressNumber(q, k);
+});
 
 // ---------------------------------------------------------------- 人体シェーマ
 function bodyLabel(id) { return S.bodyLabels[id] || id; }
@@ -314,6 +367,7 @@ function setValue(q, v) {
   else {
     var cur = S.answers[q.id] || {};
     cur.value = v;
+    delete cur.talk;          // 書いたら「診察のときに話します」は取り消す
     S.answers[q.id] = cur;
   }
   updateNext(q);
@@ -343,6 +397,8 @@ function updateNext(q) {
 
 function checkCurrent(q) {
   if (q.type === "number" && hasAnswer(q)) {
+    // 「36.」のように小数点で終わっていたら、点を取る
+    S.answers[q.id].value = String(S.answers[q.id].value).replace(/\.$/, "");
     var n = toNum(S.answers[q.id].value);
     if (n === null) return "数字で入力してください";
     if (q.min !== undefined && n < q.min) return q.min + " 以上の数字を入力してください";
@@ -402,6 +458,7 @@ $("btn-back").addEventListener("click", function () {
 function answerText(q) {
   if (!hasAnswer(q)) return null;
   var a = S.answers[q.id];
+  if (a.talk) return "診察のときに話します";
   if (q.type === "body") {
     var many = a.value.length >= 2;
     return a.value.map(function (id) { return bodyLabel(id) + (many && id === a.main ? "（いちばんつらい）" : ""); }).join("、");

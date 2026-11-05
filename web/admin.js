@@ -37,6 +37,7 @@ var A = {
   definition: null,   // いま表示している定義
   issues: [],         // Claude の見直し
   sources: {},        // 設問id → もとになった紙の文言
+  added: {},          // 設問id → 紙にない選択肢（Claude が足したもの）の一覧
   paperUrl: null
 };
 var TYPE_NAMES = { text: "自由記入", single: "1つ選ぶ", multi: "いくつでも選ぶ", number: "数字", time: "時刻", body: "体の図" };
@@ -131,6 +132,7 @@ function showResult(r) {
   A.definition = r.definition;
   A.issues = r.issues || [];
   A.sources = r.sources || {};
+  A.added = r.added || {};
   $("work").hidden = false;
   $("yaml").value = r.yaml;
   if (r.form_id && !$("form-id").value) $("form-id").value = r.form_id;
@@ -184,13 +186,22 @@ function renderQuestions() {
     li.appendChild(meta);
     if (q.options && q.options.length) {
       var ul = el("ul", { "class": "q-opts" });
+      var addedHere = A.added[q.id] || [];
+      var nAdded = 0;
       q.options.forEach(function (o) {
-        ul.appendChild(el("li", {}, o.label,
+        var isAdded = addedHere.indexOf(o.label) >= 0;
+        if (isAdded) nAdded++;
+        ul.appendChild(el("li", isAdded ? { "class": "added" } : {}, o.label,
           o.karte && o.karte !== o.label ? el("span", { "class": "k" }, " → " + o.karte) : null,
-          o.detail ? el("span", { "class": "d" }, "選ぶと記入欄：" + o.detail) : null));
+          o.detail ? el("span", { "class": "d" }, "選ぶと記入欄（書かなくても進める）：" + o.detail) : null));
       });
       li.appendChild(ul);
+      // 紙では書く欄だったものを、Claude が選ぶ形に変えた。中身は人が確かめる
+      if (nAdded) li.appendChild(el("p", { "class": "q-added" },
+        "点線の " + nAdded + " 個は紙にない選択肢です（紙の書く欄を、選ぶ形に変えました）。この内容でよいか確かめてください。"));
     }
+    if (q.type === "number") li.appendChild(el("p", { "class": "q-hint" }, "画面の大きな数字ボタンで入力します（キーボードは出ません）。"));
+    if (q.type === "text") li.appendChild(el("p", { "class": "q-hint" }, "書く欄です。「書かずに、診察のときに話します」ボタンも出ます（カルテには「口頭で確認」）。"));
     if (q.type === "body" && window.TolmonBody) {
       // 患者さんがタップする図の見本（男性の図。性別の回答で女性の図に変わる）
       var figs = el("div", { "class": "q-figs" });
