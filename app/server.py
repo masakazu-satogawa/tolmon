@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 from . import body, definitions, store
 
 MAX_BODY = 1 * 1024 * 1024  # 回答の送信は1MBまで
+MAX_PAPER = 24 * 1024 * 1024  # 作る画面で受け取る帳票（base64）は24MBまで
 
 # /karte は電子カルテの【問診】アイコンから患者IDつきで開く画面（中身は医師画面と同じ）
 PAGES = {"/": "index.html", "/doctor": "doctor.html", "/karte": "doctor.html", "/reception": "reception.html"}
@@ -47,6 +48,12 @@ class App:
         self._lock = threading.Lock()
         store.init_db(self.data_dir)
         self.reload()
+        # 作る側（Claude API を使う）は、設定で有効にしたときだけ読み込む。
+        # 院内の閉域網に置くサーバーでは false のまま（creator フォルダごと無くてもよい）
+        self.creator = None
+        if config.get("creator", {}).get("enabled"):
+            from creator import service
+            self.creator = service
 
     def reload(self):
         defs, errors = definitions.load_dir(*self.def_dirs)
@@ -94,9 +101,9 @@ class Handler(BaseHTTPRequestHandler):
         with open(path, "rb") as f:
             self._send(200, f.read(), ctype)
 
-    def _read_json(self):
+    def _read_json(self, limit=MAX_BODY):
         length = int(self.headers.get("Content-Length") or 0)
-        if length <= 0 or length > MAX_BODY:
+        if length <= 0 or length > limit:
             raise ValueError("送信データの大きさが正しくありません")
         return json.loads(self.rfile.read(length).decode("utf-8"))
 
@@ -109,6 +116,16 @@ class Handler(BaseHTTPRequestHandler):
 
         if path in PAGES:
             return self._static(PAGES[path])
+        if path == "/admin" or path.startswith("/api/creator/"):
+            if not app.creator:
+                return self._error(404, "このサーバーでは「作る画面」は使えません（設定の creator.enabled が false）")
+            if path == "/admin":
+                return self._static("admin.html")
+            if path == "/api/creator/info":
+                return self._json(app.creator.info())
+            if path == "/api/creator/last":
+                return self._json(app.creator.last())
+            return self._error(404, "ページがありません")
         if path.startswith("/static/"):
             return self._static(path[len("/static/"):])
         if path == "/api/config":
@@ -141,10 +158,29 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         path = urlparse(self.path).path
         app = self.app
+        creating = path.startswith("/api/creator/")
+        if creating and not app.creator:
+            return self._error(404, "このサーバーでは「作る画面」は使えません")
         try:
-            body = self._read_json() if path != "/api/reload" else {}
+            # 帳票（PDF・画像）を受け取る作る画面だけ、大きなデータを許す
+            body = self._read_json(MAX_PAPER if creating else MAX_BODY) if path != "/api/reload" else {}
         except (ValueError, UnicodeDecodeError):
             return self._error(400, "送信データが読めません")
+
+        if creating:
+            try:
+                if path == "/api/creator/read":
+                    return self._json(app.creator.read(body))
+                if path == "/api/creator/check":
+                    return self._json(app.creator.check_yaml(body))
+                if path == "/api/creator/save":
+                    res = app.creator.save(body, app.def_dirs[0])
+                    if res.get("ok"):
+                        app.reload()
+                    return self._json(res)
+            except app.creator.ServiceError as e:
+                return self._error(400, str(e))
+            return self._error(404, "ページがありません")
 
         if path == "/api/answers":
             # 患者さんの送信：患者IDなしの「受付待ち」で保存し、受付番号を返す
@@ -190,6 +226,8 @@ def serve(root, config):
     print(f"  受付待ち一覧　: http://{shown}:{port}/reception")
     print(f"  医師・看護師　: http://{shown}:{port}/karte?pcode=患者ID（電子カルテの【問診】から）")
     print(f"  問診一覧　　　: http://{shown}:{port}/doctor")
+    if app.creator:
+        print(f"  作る画面　　　: http://{shown}:{port}/admin（Claude で白紙の問診票を読み取る。情報系PC用）")
     print(f"  問診票: {', '.join(d['title'] for d in app.defs.values()) or '（なし）'}")
     try:
         httpd.serve_forever()

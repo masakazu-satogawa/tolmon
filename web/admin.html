@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>問診票をつくる | トルモン</title>
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/admin.css">
+</head>
+<body class="admin">
+<header class="a-head">
+  <div>
+    <h1>問診票をつくる</h1>
+    <p class="a-lead">白紙の問診票を選ぶと、Claude が読み取って Web問診の下書きを作ります。<b>読み取りはAI、確定は人。</b></p>
+  </div>
+  <p id="a-env" class="a-env"></p>
+</header>
+
+<section class="a-step">
+  <div class="a-form">
+    <label class="a-field"><span><b>1</b> 白紙の問診票（PDF・画像）</span>
+      <input id="file" type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg">
+    </label>
+    <label class="a-field"><span><b>2</b> 問診ID（半角英数字）</span>
+      <input id="form-id" type="text" placeholder="例：naika" autocomplete="off" spellcheck="false">
+    </label>
+    <button id="btn-read" class="a-btn primary" type="button" disabled>読み取る</button>
+  </div>
+  <p class="a-safe">Claude に送るのは、この白紙の帳票だけです。患者さんの回答は送りません。</p>
+  <p id="read-msg" class="a-msg" hidden></p>
+</section>
+
+<div id="work" class="a-work" hidden>
+  <aside class="a-paper">
+    <h2>紙（もとの帳票）</h2>
+    <div id="paper" class="a-paper-box"></div>
+  </aside>
+
+  <section class="a-result">
+    <div class="a-tabs" role="tablist">
+      <button type="button" data-tab="questions" aria-pressed="true">設問 <span id="n-questions" class="n"></span></button>
+      <button type="button" data-tab="issues">Claudeの見直し <span id="n-issues" class="n"></span></button>
+      <button type="button" data-tab="skipped">外した欄 <span id="n-skipped" class="n"></span></button>
+      <button type="button" data-tab="yaml">直す（YAML）</button>
+    </div>
+
+    <div id="problems" class="a-problems" hidden></div>
+
+    <div id="tab-questions" class="a-pane"><ol id="q-list" class="q-cards"></ol></div>
+    <div id="tab-issues" class="a-pane" hidden>
+      <p id="summary" class="a-summary"></p>
+      <ul id="issue-list" class="issues"></ul>
+      <h3>読み取りメモ（Claude が迷った点）</h3>
+      <ul id="note-list" class="notes"></ul>
+    </div>
+    <div id="tab-skipped" class="a-pane" hidden>
+      <p class="sub">病院のルールで、設問にしなかった欄です。</p>
+      <ul id="skip-list" class="skips"></ul>
+      <details class="a-rules"><summary>この病院のルールを見る（creator/hospital_rules.md）</summary><pre id="rules"></pre></details>
+    </div>
+    <div id="tab-yaml" class="a-pane" hidden>
+      <p class="sub">文言・選択肢・分岐をここで直せます。直したら「反映して確認」を押してください。</p>
+      <textarea id="yaml" spellcheck="false" aria-label="問診定義（YAML）"></textarea>
+      <div class="a-actions"><button id="btn-check" class="a-btn" type="button">反映して確認</button><span id="check-msg" class="a-inline"></span></div>
+    </div>
+
+    <footer class="a-foot">
+      <span id="usage" class="a-usage"></span>
+      <button id="btn-save" class="a-btn primary" type="button">この内容で確定して公開</button>
+    </footer>
+    <p id="save-msg" class="a-msg" hidden></p>
+  </section>
+</div>
+
+<script src="/static/admin.js"></script>
+</body>
+</html>

@@ -16,6 +16,11 @@ paths:
   # 回答を保存するフォルダ
   data: "data"
 
+creator:
+  # 作る画面（/admin）。白紙の問診票を Claude に読ませて問診を作る。インターネットと APIキー（.env）が必要。
+  # 院内の閉域網に置く問診サーバーでは false にする（患者さんが使う側では AI を一切動かさない）
+  enabled: true
+
 patient:
   # 患者画面で操作がないとき、この秒数で「続けますか？」を出す
   idle_seconds: 180
