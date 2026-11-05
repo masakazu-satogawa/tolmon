@@ -11,20 +11,18 @@ DEF = definitions.load_file(os.path.join(ROOT, "definitions", "sample_seikei.yam
 BASE = {"symptom": {"value": ["痛い"]}}
 
 
-class RegionSyncTest(unittest.TestCase):
-    def test_js_ids_match_python(self):
-        """web/body.js に出てくる部位 id が app/body.py の一覧と一致すること。"""
-        with open(os.path.join(ROOT, "web", "body.js"), encoding="utf-8") as f:
-            js = f.read()
-        ids = set(re.findall(r'part\("([a-z_]+)"', js))
-        # hand()/foot() で組み立てる id
-        for side in ("r", "l"):
-            ids.update(side + s for s in ("_palm", "_hand_back", "_wrist", "_thumb", "_index", "_middle", "_ring", "_little",
-                                          "_sole", "_foot_top", "_toes", "_heel", "_ankle"))
-        # pair() で組み立てる id は文字列リテラルで出てくる
-        ids.update(re.findall(r'"([rl]_[a-z_]+)"', js))
-        self.assertEqual(ids - set(body.REGIONS), set(), "JSにあってPythonにない id")
-        self.assertEqual(set(body.REGIONS) - ids, set(), "PythonにあってJSにない id")
+class BodyDataTest(unittest.TestCase):
+    def test_data_file_is_up_to_date(self):
+        """web/body-data.js が tools/make_body.py の出力と同じであること（作り直し忘れを見つける）。"""
+        from tools import make_body
+        with open(os.path.join(ROOT, "web", "body-data.js"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), make_body.build(), "python -X utf8 tools/make_body.py を実行してください")
+
+    def test_region_ids_match(self):
+        """図の中の部位 id が app/body.py の一覧と過不足なく一致すること。"""
+        with open(os.path.join(ROOT, "web", "body-data.js"), encoding="utf-8") as f:
+            ids = set(re.findall(r'data-id=\\"([a-z_]+)\\"', f.read()))
+        self.assertEqual(ids, set(body.REGIONS))
 
 
 class BodyAnswerTest(unittest.TestCase):

@@ -246,18 +246,23 @@ function renderBody(q, a, body) {
     b.addEventListener("click", function () { S.bodyView[q.id] = v.id; renderQuestion(); });
     tabs.appendChild(b);
   });
-  var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("class", "body-svg");
+  var box = el("div", { "class": "body-box" });
   var selected = {};
   (a.value || []).forEach(function (id) { selected[id] = true; });
-  TolmonBody.draw(current, svg, selected, S.bodyLabels, function (id) { toggleBody(q, id); });
+  TolmonBody.draw(current, box, selected, function (id) { toggleBody(q, id); }, bodySex(q));
   var picked = a.value || [];
   var list = el("p", { "class": "body-selected" + (picked.length ? "" : " empty") },
     picked.length ? "選んだところ：" + picked.map(bodyLabel).join("、") : "図をタップして選んでください");
   body.appendChild(tabs);
-  body.appendChild(svg);
+  body.appendChild(box);
   body.appendChild(list);
   updateNext(q);
+}
+
+// 図の男女：性別の設問（既定は id "sex"）で「女性」と答えていれば女性の図。答えていなければ男性の図
+function bodySex(q) {
+  var a = S.answers[q.sex_q || "sex"];
+  return a && a.value === (q.female || "女性") ? "f" : "m";
 }
 
 function toggleBody(q, id) {

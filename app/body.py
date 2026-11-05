@@ -1,7 +1,9 @@
-"""人体シェーマ（設問タイプ body）の部位一覧。
+"""人体シェーマ（設問タイプ body）の部位一覧。ここが部位 id と表示名の正本。
 
-id は web/body.js の図形と一致させる（tests/test_body.py で突き合わせる）。
-「右・左」は患者さん本人から見た左右。図の上では正面図だけ左右が逆に見える。
+図（線画とタップの区切り）は tools/make_body.py が web/body-data.js に書き出す。
+部位を足したり名前を変えたりしたら、tools/make_body.py を直して実行し直すこと
+（tests/test_body.py が、図とこの一覧のずれを見つける）。
+「右・左」は患者さん本人から見た左右。
 """
 
 REGIONS = {
@@ -14,6 +16,7 @@ REGIONS = {
     "r_upper_arm": "右上腕", "l_upper_arm": "左上腕",
     "r_forearm": "右前腕", "l_forearm": "左前腕",
     "r_hand": "右手", "l_hand": "左手",
+    "r_hip": "右股関節", "l_hip": "左股関節",
     "r_thigh": "右太もも", "l_thigh": "左太もも",
     "r_knee": "右ひざ", "l_knee": "左ひざ",
     "r_shin": "右すね", "l_shin": "左すね",
@@ -25,6 +28,7 @@ REGIONS = {
     "r_elbow": "右ひじ", "l_elbow": "左ひじ",
     "r_buttock": "右おしり", "l_buttock": "左おしり",
     "r_thigh_back": "右太もも（裏）", "l_thigh_back": "左太もも（裏）",
+    "r_knee_back": "右ひざ裏", "l_knee_back": "左ひざ裏",
     "r_calf": "右ふくらはぎ", "l_calf": "左ふくらはぎ",
     "r_heel": "右かかと", "l_heel": "左かかと",
     # 頭（顔・後ろ）
@@ -51,7 +55,8 @@ REGIONS = {
     "r_foot_top": "右足の甲", "l_foot_top": "左足の甲",
     "r_sole": "右足の裏", "l_sole": "左足の裏",
     "r_ankle": "右足首", "l_ankle": "左足首",
-    "r_toes": "右足の指", "l_toes": "左足の指",
+    "r_big_toe": "右足の親指", "l_big_toe": "左足の親指",
+    "r_toes": "右足の指（親指以外）", "l_toes": "左足の指（親指以外）",
 }
 
 VIEWS = ("front", "back", "head", "hands", "feet")

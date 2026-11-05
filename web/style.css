@@ -130,14 +130,15 @@ textarea:focus, .q-input:focus { outline: 3px solid var(--accent); border-color:
   background: var(--card); font-weight: 700; cursor: pointer;
 }
 .body-tab[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
-.body-svg { width: 100%; height: auto; max-height: calc(var(--vh) * 54); display: block; }
-.body-tabs ~ .body-svg { margin: -4px 0; }
+.body-box { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 6px; }
+.body-svg { width: 100%; height: auto; max-height: calc(var(--vh) * 56); display: block; }
 /* 図の設問は見出しと図の間を詰め、図をできるだけ大きく */
 .q-body.is-body { gap: 8px; }
-.body-svg .part { fill: #fff; stroke: #6b7773; stroke-width: 1.5; cursor: pointer; }
-.body-svg .part.on { fill: var(--accent); stroke: var(--accent); }
-.body-svg .outline { fill: none; stroke: var(--line); stroke-width: 1.5; }
-.body-svg .label { fill: var(--muted); font-size: 11px; font-family: inherit; }
+/* タップの区切り：ふだんは見えない。選ぶと色がつく（線画が透けて見える濃さ） */
+.body-svg .part { fill: transparent; pointer-events: all; cursor: pointer; }
+.body-svg .part.on { fill: var(--accent); fill-opacity: .5; }
+.body-svg.bounds .part { stroke: #c2410c; stroke-width: .7; stroke-dasharray: 3 2; }
+.body-svg .label { fill: var(--muted); font-size: 10px; font-family: inherit; pointer-events: none; }
 .body-svg .label.cap { font-size: 12px; font-weight: 700; fill: var(--ink); }
 .body-selected { margin: 0; font-weight: 700; }
 .body-selected.empty { color: var(--muted); font-weight: 400; }
