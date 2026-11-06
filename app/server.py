@@ -39,10 +39,20 @@ def is_local(address):
 def lan_addresses():
     """このPCの、ネットワーク上のアドレス（タブレットから開くときに使う）。"""
     try:
-        found = socket.gethostbyname_ex(socket.gethostname())[2]
+        found = [a for a in socket.gethostbyname_ex(socket.gethostname())[2] if not a.startswith("127.")]
     except OSError:
-        return []
-    return [a for a in found if not a.startswith("127.")]
+        found = []
+    # ふだん外へ出ていくときに使うアドレス（Wi-Fi など）を先頭にする。仮想のアダプタのアドレスが先に出ると、打ち間違える。
+    # UDP の connect は行き先を決めるだけで、何も送らない
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("192.0.2.1", 9))
+            main = s.getsockname()[0]
+        if main and not main.startswith("127."):
+            found = [main] + [a for a in found if a != main]
+    except OSError:
+        pass
+    return found
 
 
 class App:
@@ -301,9 +311,13 @@ def serve(root, config):
         print(f"  作る画面　　　: http://{shown}:{port}/admin（Claude で白紙の問診票を読み取る。このPCからだけ開ける）")
     if host == "0.0.0.0":
         print("  ── ほかの端末（タブレット）から開くとき ──")
-        for a in lan_addresses() or ["（このPCのアドレスが分かりませんでした。ipconfig で確かめてください）"]:
-            print(f"  　http://{a}:{port}/")
-        print("  　アドレスが2つ以上出たら、タブレットと同じWi-Fiのもの（多くは 192.168. で始まる）を使います")
+        found = lan_addresses()
+        if not found:
+            print("  　（このPCのアドレスが分かりませんでした。ipconfig で確かめてください）")
+        else:
+            print(f"  　タブレットのブラウザに、これを打ちます →  http://{found[0]}:{port}/")
+            for a in found[1:]:
+                print(f"  　（上でつながらないときだけ試す：http://{a}:{port}/）")
     print(f"  問診票: {', '.join(d['title'] for d in app.defs.values()) or '（なし）'}")
     try:
         httpd.serve_forever()
