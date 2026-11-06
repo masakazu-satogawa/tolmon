@@ -7,7 +7,7 @@ ROOT = os.path.join(os.path.dirname(__file__), "..")
 sys.path.insert(0, ROOT)
 from app import body, definitions, karte, store  # noqa: E402
 
-DEF = definitions.load_file(os.path.join(ROOT, "definitions", "sample_seikei.yaml"))
+DEF = definitions.load_file(os.path.join(ROOT, "samples", "definitions", "sample_seikei.yaml"))
 BASE = {"symptom": {"value": ["痛い"]}}
 
 
@@ -31,7 +31,7 @@ class BodyAnswerTest(unittest.TestCase):
         self.assertEqual(a["site"], {"value": ["r_foot"], "main": "r_foot"})
         text = karte.karte_text(DEF, a, "2026/11/04 10:00")
         self.assertIn("〔主訴〕右足／症状：疼痛", text)
-        self.assertIn("〔現病歴〕症状のある部位：右足", text)
+        self.assertNotIn("症状のある部位", text)      # 1か所だけなら主訴に出ているので、くり返さない
 
     def test_many_sites_with_main(self):
         a = store.clean_answers(DEF, dict(BASE, site={"value": ["l_shoulder", "r_foot", "l_shoulder"], "main": "r_foot"}))

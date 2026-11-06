@@ -1,9 +1,10 @@
 """問診定義（definitions/*.yaml）の読み込みと検証。"""
 
 import hashlib
+import json
 import os
 
-from . import body, yamlmini
+from . import body, lang, yamlmini
 
 TYPES = ("text", "single", "multi", "number", "time", "body")
 TAGS = ("基本情報", "主訴", "現病歴", "既往歴", "内服薬", "アレルギー", "生活歴", "その他")
@@ -85,8 +86,12 @@ def validate(d):
                         errs.append(f"{where}: 選択肢に label がありません")
                         continue
                     labels.append(o["label"])
+                    if "alert" in o and not isinstance(o["alert"], bool):
+                        errs.append(f"{where}: 選択肢の alert は true か false で書いてください")
                 if len(set(labels)) != len(labels):
                     errs.append(f"{where}: 同じ選択肢が重複しています")
+        if "alert" in q and (not isinstance(q["alert"], bool) or t not in CHOICE_TYPES):
+            errs.append(f"{where}: alert は選ぶ設問（single / multi）に true か false で書いてください")
         if t == "body" and q.get("views") is not None:
             views = q["views"]
             if not isinstance(views, list) or not views or any(v not in body.VIEWS for v in views):
@@ -117,6 +122,76 @@ def load_file(path):
     return d
 
 
+# ---------------------------------------------------------------- 外国語の画面（設問と選択肢の訳）
+
+def i18n_key(d):
+    """患者さんに見せる言葉（設問文・ヒント・単位・選択肢・記入欄の説明）だけから作る合言葉。
+    訳を作ったあとで問診票の言葉が変わったら、古い訳を出さないために使う。"""
+    seen = [d.get("title", "")]
+    for q in d.get("questions", []):
+        seen.append([q["id"], q.get("text", ""), q.get("hint", ""), q.get("unit", ""),
+                     [[o["label"], o.get("detail", "")] for o in q.get("options") or []]])
+    return hashlib.sha256(json.dumps(seen, ensure_ascii=False).encode("utf-8")).hexdigest()[:12]
+
+
+def check_i18n(d, tr):
+    """訳（definitions/i18n/*.yaml の中身）を問診票と突き合わせ、画面で使う形にして返す。
+    欠けがあれば DefinitionError（訳が欠けた画面は出さない）。"""
+    if not isinstance(tr, dict) or not isinstance(tr.get("questions"), list):
+        raise DefinitionError("訳の形が正しくありません")
+    if tr.get("key") != i18n_key(d):
+        raise DefinitionError("問診票の言葉が変わったので、この訳は使えません（作る画面で訳を作り直してください）")
+    by_id = {q.get("id"): q for q in tr["questions"] if isinstance(q, dict)}
+    errs = []
+    out = {"title": str(tr.get("title") or d["title"]), "q": {}}
+    for q in d["questions"]:
+        t = by_id.get(q["id"]) or {}
+        item = {"text": str(t.get("text") or "")}
+        if not item["text"]:
+            errs.append(f"{q['id']}: 設問文の訳がありません")
+        for k in ("hint", "unit"):
+            if q.get(k):
+                item[k] = str(t.get(k) or "")
+                if not item[k] and k == "hint":
+                    errs.append(f"{q['id']}: ヒントの訳がありません")
+        if q.get("options"):
+            opts = {o.get("label"): o for o in t.get("options") or [] if isinstance(o, dict)}
+            item["o"] = {}
+            for o in q["options"]:
+                x = opts.get(o["label"]) or {}
+                one = {"t": str(x.get("text") or "")}
+                if not one["t"]:
+                    errs.append(f"{q['id']}: 選択肢「{o['label']}」の訳がありません")
+                if o.get("detail"):
+                    one["d"] = str(x.get("detail") or "")
+                    if not one["d"]:
+                        errs.append(f"{q['id']}: 選択肢「{o['label']}」の記入欄の訳がありません")
+                item["o"][o["label"]] = one
+        out["q"][q["id"]] = item
+    if errs:
+        raise DefinitionError("\n".join(errs))
+    return out
+
+
+def load_i18n(folder, defs, errors):
+    """<定義フォルダ>/i18n/<問診ID>.<言語>.yaml を読み、合うものだけ定義の _i18n に付ける。"""
+    sub = os.path.join(folder, "i18n")
+    if not os.path.isdir(sub):
+        return
+    for name in sorted(os.listdir(sub)):
+        if not name.endswith(".yaml"):
+            continue
+        try:
+            with open(os.path.join(sub, name), encoding="utf-8-sig") as f:
+                tr = yamlmini.load(f.read())
+            d = defs.get(tr.get("id")) if isinstance(tr, dict) else None
+            if d is None or tr.get("lang") not in lang.LANGS:
+                raise DefinitionError("もとの問診票がない、または言語の指定が正しくありません")
+            d.setdefault("_i18n", {})[tr["lang"]] = check_i18n(d, tr)
+        except (yamlmini.YamlError, DefinitionError) as e:
+            errors.append(f"外国語の画面 {name} は出していません：{e}")
+
+
 def load_dir(*dirs):
     """フォルダ内の定義をすべて読む。壊れた定義は読まずに errors に入れる（他の問診は止めない）。"""
     defs, errors = {}, []
@@ -135,4 +210,6 @@ def load_dir(*dirs):
                 errors.append(f"{name}: id「{d['id']}」が他の定義と重複しています")
                 continue
             defs[d["id"]] = d
+    for folder in dirs:
+        load_i18n(folder, defs, errors)
     return defs, errors

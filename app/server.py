@@ -9,7 +9,7 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-from . import body, definitions, store
+from . import body, definitions, lang, store
 
 MAX_BODY = 1 * 1024 * 1024  # 回答の送信は1MBまで
 MAX_PAPER = 24 * 1024 * 1024  # 作る画面で受け取る帳票（base64）は24MBまで
@@ -102,6 +102,9 @@ class Handler(BaseHTTPRequestHandler):
         with open(path, "rb") as f:
             self._send(200, f.read(), ctype)
 
+    def _client(self):
+        return {"ip": self.client_address[0], "ua": self.headers.get("User-Agent", "")[:200]}
+
     def _read_json(self, limit=MAX_BODY):
         length = int(self.headers.get("Content-Length") or 0)
         if length <= 0 or length > limit:
@@ -133,6 +136,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, found[0], found[1])
             if path == "/api/creator/drafts":
                 return self._json({"drafts": app.creator.drafts()})
+            if path == "/api/creator/translation":
+                return self._json(app.creator.translation(qs.get("form_id", ""), app.defs))
             if path == "/api/creator/trial":
                 try:
                     return self._json(app.creator.trial())
@@ -145,8 +150,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(app.client_config)
         if path == "/api/body":
             return self._json({"regions": body.REGIONS, "views": list(body.VIEWS)})
+        if path == "/api/lang":
+            return self._json(lang.client_data())
         if path == "/api/forms":
-            forms = [{"id": d["id"], "title": d["title"], "version": d.get("version"), "count": len(d["questions"])}
+            forms = [{"id": d["id"], "title": d["title"], "version": d.get("version"), "count": len(d["questions"]),
+                      "langs": list(d.get("_i18n") or {})}
                      for d in app.defs.values()]
             return self._json({"forms": forms, "errors": app.def_errors})
         if path.startswith("/api/forms/"):
@@ -160,10 +168,13 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/pending":
             day = qs.get("date") or datetime.now().strftime("%Y-%m-%d")
             return self._json({"records": store.list_pending(app.data_dir, day)})
+        if path == "/api/access":
+            return self._json({"records": store.list_access(app.data_dir, day=qs.get("date")), "actions": store.ACTIONS})
         if path.startswith("/api/answers/"):
             rec = store.load_record(app.data_dir, path[len("/api/answers/"):])
             if not rec:
                 return self._error(404, "記録がありません")
+            store.log_access(app.data_dir, "view", rec["record_id"], self._client(), rec.get("pcode"))
             return self._json(rec)
         return self._error(404, "ページがありません")
 
@@ -194,6 +205,14 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json(app.creator.set_trial(body))
                 if path == "/api/creator/trial/karte":
                     return self._json(app.creator.trial_karte(body))
+                if path == "/api/creator/translate":
+                    return self._json(app.creator.make_translation(body, app.defs))
+                if path == "/api/creator/translation/fix":
+                    return self._json(app.creator.fix_translation(body, app.defs))
+                if path == "/api/creator/translation/publish":
+                    res = app.creator.publish_translation(body, app.defs, app.def_dirs[0])
+                    app.reload()
+                    return self._json(res)
                 if path == "/api/creator/save":
                     res = app.creator.save(body, app.def_dirs[0])
                     if res.get("ok"):
@@ -210,8 +229,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._error(400, "問診票が見つかりません（受付でやり直してください）")
             if body.get("form_hash") and body["form_hash"] != d.get("_hash"):
                 return self._error(409, "問診票が更新されました。受付でやり直してください")
-            meta = {"started_at": body.get("started_at"),
-                    "client": {"ip": self.client_address[0], "ua": self.headers.get("User-Agent", "")[:200]}}
+            meta = {"started_at": body.get("started_at"), "seconds": body.get("seconds"), "lang": body.get("lang"),
+                    "client": self._client()}
             try:
                 rec = store.save_pending(app.data_dir, d, body.get("answers"), meta)
             except store.AnswerError as e:
@@ -227,7 +246,15 @@ class Handler(BaseHTTPRequestHandler):
                 rec = store.register(app.data_dir, record_id, pcode)
             except store.AnswerError as e:
                 return self._error(400, str(e))
+            store.log_access(app.data_dir, "register", record_id, self._client(), pcode)
             return self._json({"ok": True, **rec})
+        if path.startswith("/api/answers/") and path.endswith("/copied"):
+            # 医師・看護師の画面で「コピー」を押した記録
+            record_id = path[len("/api/answers/"):-len("/copied")]
+            if not store.load_record(app.data_dir, record_id):
+                return self._error(404, "記録がありません")
+            store.log_access(app.data_dir, "copy", record_id, self._client())
+            return self._json({"ok": True})
         if path == "/api/reload":
             defs, errors = app.reload()
             return self._json({"ok": not errors, "forms": list(defs), "errors": errors})

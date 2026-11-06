@@ -72,6 +72,11 @@ READ_SYSTEM = """あなたは、病院の紙の問診票を、タブレットで
 - 病名といつ頃、のように同じ形が何行も並ぶ表：まず「ある・ない」の single にし、「ある」の detail に書き方の例を入れる。
 - 表の形のアンケート（各行に質問、右に選択肢）：1行を1つの single の設問にする。
 
+# 要確認の印（alert）
+- 医師・看護師の画面のいちばん上に目立たせたい答えには、選択肢の alert を true にする。それ以外は false。
+- どの答えに印を付けるかは「この病院のルール」に書いてある。ルールにない答えには付けない。
+  印は「見落とさないため」のもので、病気や重さの判断ではない。
+
 # 分岐（show_if）
 - 紙に書かれている条件、または「この病院のルール」にある条件だけを使う。
 - 参照する設問は、必ずその設問より前にあること。q には設問の id、value には選択肢の label をそのまま入れる。
@@ -126,8 +131,9 @@ READ_SCHEMA = {
                                 "karte": {"type": "string"},
                                 "detail": {"type": "string", "description": "選んだときだけ出す記入欄の説明。不要なら空文字"},
                                 "added": {"type": "boolean", "description": "紙にない選択肢を足したとき true。紙にある選択肢は false"},
+                                "alert": {"type": "boolean", "description": "病院のルールで「要確認の印」を付ける答えなら true。ほかは false"},
                             },
-                            "required": ["label", "karte", "detail", "added"],
+                            "required": ["label", "karte", "detail", "added", "alert"],
                             "additionalProperties": False,
                         },
                     },
@@ -207,6 +213,7 @@ CHECK_SYSTEM = """あなたは、問診票の検査担当者です。
   参照先の設問に答えていないとき、eq と gte の条件は満たさない（出ない）、ne と lt の条件は満たす（出る）。
 - 文言　　：患者さん向けの文が、紙の意味を変えていないか。むずかしすぎないか。
 - ルール　：「この病院のルール」に反していないか（聞かない欄を聞いている、残す欄を外している、など）。
+- 要確認の印：alert が true の選択肢が、「この病院のルール」の決まりと合っているか（付け忘れ、付けすぎ）。
 
 # 重さ（severity）
 - error   ：このままでは使えない（抜け、選択肢の誤り、分岐の誤り、ルール違反）。
@@ -286,6 +293,8 @@ def to_definition(draft, form_id, version=1):
                     od["karte"] = o["karte"]
                 if o.get("detail"):
                     od["detail"] = o["detail"]
+                if o.get("alert"):
+                    od["alert"] = True
                 opts.append(od)
             d["options"] = opts
         conds = [{"q": c["q"], c["op"]: (_number(c["value"]) if c["op"] in ("lt", "gte") else c["value"])}

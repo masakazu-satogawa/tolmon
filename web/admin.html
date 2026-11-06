@@ -65,6 +65,7 @@
       <button type="button" data-tab="issues">Claudeの見直し <span id="n-issues" class="n"></span></button>
       <button type="button" data-tab="skipped">外した欄 <span id="n-skipped" class="n"></span></button>
       <button type="button" data-tab="dummy">ダミー患者 <span id="n-dummy" class="n" hidden></span></button>
+      <button type="button" data-tab="lang">外国語 <span id="n-lang" class="n" hidden></span></button>
       <button type="button" data-tab="yaml">直す（YAML）</button>
     </div>
 
@@ -93,6 +94,16 @@
       </div>
       <div id="dummy-summary" class="d-summary" hidden></div>
       <ol id="dummy-list" class="d-list"></ol>
+    </div>
+    <div id="tab-lang" class="a-pane" hidden>
+      <p class="sub">公開した問診票を、英語（English）と繁体字中国語（繁體中文）の画面にします。Claude が訳し、別の Claude がその訳だけを見て日本語に戻し、もとの日本語と比べます。
+        「もとの日本語」と「日本語に戻したもの」を見比べて、よければ公開してください。カルテに出る文は、どの言語で答えても日本語です。</p>
+      <div class="a-actions">
+        <button id="btn-translate" class="a-btn primary" type="button">英語・繁体字中国語の訳を作る</button>
+        <span id="lang-msg" class="a-inline"></span>
+      </div>
+      <p id="lang-state" class="a-summary"></p>
+      <div id="lang-result"></div>
     </div>
     <div id="tab-yaml" class="a-pane" hidden>
       <p class="sub">文言・選択肢・分岐をここで直せます。直したら「反映して確認」を押してください。</p>

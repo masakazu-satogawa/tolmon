@@ -37,6 +37,12 @@ body.karte .d-link { display: none; }
   width: 100%; min-height: 200px; resize: vertical; font-family: "BIZ UDGothic", "MS Gothic", "Osaka-Mono", monospace;
   font-size: 1rem; line-height: 1.7; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: #fbfcfb;
 }
+/* 要確認の印（病院が決めた答えを、いちばん上に出す） */
+.d-alert { display: flex; gap: 14px; align-items: flex-start; margin: 0 0 14px; padding: 12px 16px; border: 2px solid var(--warn); border-radius: 10px; background: var(--warn-soft); }
+.d-alert-head { flex: none; background: var(--warn); color: #fff; font-weight: 700; border-radius: 6px; padding: 2px 12px; }
+.d-alert ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; font-weight: 700; }
+.d-lang { background: var(--accent-soft); color: var(--accent); border-radius: 999px; padding: 0 10px; font-weight: 700; }
+.d-qa .shown { color: var(--muted); font-size: .85rem; }
 .d-qa { margin: 18px 0 0; }
 .d-qa summary { cursor: pointer; color: var(--muted); font-weight: 700; }
 .d-qa ol { margin: 10px 0 0; padding-left: 1.6em; display: flex; flex-direction: column; gap: 8px; }

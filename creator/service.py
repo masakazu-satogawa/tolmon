@@ -9,13 +9,14 @@ from datetime import datetime
 
 from app import definitions, karte, store, yamlmini
 
-from . import claude_api, dummy, reader
+from . import claude_api, dummy, reader, translate
 
 _FORM_ID = re.compile(r"^[a-z][a-z0-9_]{1,30}$")
 _drafts = {}                    # 読み取った下書き。問診ID → 結果（画面を開き直しても、起動し直しても消えない）
 _trial = {}                     # 公開前に患者さんの画面で試す定義（覚えるだけ。保存しない）
 _lock = threading.Lock()
 _draft_dir = None               # 下書きを置くフォルダ（use_draft_dir で決まる）
+_i18n_dir = None                # 外国語の訳の下書きを置くフォルダ
 
 
 class ServiceError(ValueError):
@@ -55,8 +56,9 @@ def read(body, model=claude_api.DEFAULT_MODEL):
 def use_draft_dir(path):
     """下書きの置き場所を決めて、置いてある下書きを読み込む（問診票ごとに1ファイル）。
     置くのは白紙の帳票から作った設問の下書きだけ（患者さんの回答は入らない）。"""
-    global _draft_dir
+    global _draft_dir, _i18n_dir
     _draft_dir = os.path.join(path, "creator_drafts")
+    _i18n_dir = os.path.join(path, "creator_i18n")
     found = {}
     names = sorted(os.listdir(_draft_dir)) if os.path.isdir(_draft_dir) else []
     files = [os.path.join(_draft_dir, n) for n in names if n.endswith(".json")]
@@ -239,6 +241,115 @@ def save(body, def_dir):
         f.write(text if text.endswith("\n") else text + "\n")
     os.replace(tmp, path)
     return {"ok": True, "file": os.path.basename(path), "title": res["definition"].get("title", "")}
+
+
+# ---------------------------------------------------------------- 外国語の画面（訳す → 日本語に戻す → 比べる → 人が確かめて公開）
+
+def _i18n_path(form_id):
+    return os.path.join(_i18n_dir, form_id + ".json") if _i18n_dir and _FORM_ID.match(str(form_id)) else None
+
+
+def _published(defs, form_id):
+    defn = defs.get(str(form_id))
+    if not defn:
+        raise ServiceError("この問診票は、まだ公開されていません。先に「確定して公開」を押してください")
+    return defn
+
+
+def translation(form_id, defs):
+    """訳の下書き（あれば）と、いま患者さんの画面に出ている言語。"""
+    defn = defs.get(str(form_id))
+    out = {"form_id": form_id, "published": bool(defn), "live": list((defn or {}).get("_i18n") or {}),
+           "langs": [{"id": k, "name": v} for k, v in translate.LANGS.items()], "draft": None, "stale": False}
+    path = _i18n_path(form_id)
+    if path and os.path.exists(path):
+        try:
+            with open(path, encoding="utf-8") as f:
+                out["draft"] = json.load(f)
+        except (OSError, ValueError):
+            pass
+    if out["draft"] and defn:
+        # 訳を作ったあとで問診票の言葉が変わっていたら、作り直してもらう
+        out["stale"] = out["draft"].get("key") != definitions.i18n_key(defn)
+    return out
+
+
+def make_translation(body, defs, model=claude_api.DEFAULT_MODEL):
+    """公開中の問診票を、英語・繁体字中国語に訳す。言語ごとに並行して進める。2〜3分かかる。"""
+    form_id = str(body.get("form_id", ""))
+    defn = _published(defs, form_id)
+    codes = [c for c in (body.get("langs") or list(translate.LANGS)) if c in translate.LANGS]
+    results, errors = {}, {}
+
+    def work(code):
+        try:
+            results[code] = translate.make(defn, code, model=model)
+        except (claude_api.ClaudeError, definitions.DefinitionError) as e:
+            errors[code] = str(e)
+
+    threads = [threading.Thread(target=work, args=(c,)) for c in codes]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    if not results:
+        raise ServiceError("訳せませんでした：" + " ／ ".join(errors.values()))
+    draft = {"form_id": form_id, "title": defn["title"], "key": definitions.i18n_key(defn),
+             "made_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+             "langs": {c: results[c] for c in codes if c in results}, "errors": errors}
+    path = _i18n_path(form_id)
+    if path:
+        os.makedirs(_i18n_dir, exist_ok=True)
+        with open(path + ".tmp", "w", encoding="utf-8") as f:
+            json.dump(draft, f, ensure_ascii=False)
+        os.replace(path + ".tmp", path)
+    return translation(form_id, defs)
+
+
+def fix_translation(body, defs):
+    """人が訳を1か所直す（Claude の指摘の「直す案」を使うか、自分で打つ）。"""
+    form_id, code = str(body.get("form_id", "")), str(body.get("lang", ""))
+    text = str(body.get("text", "")).strip()
+    state = translation(form_id, defs)
+    one = ((state["draft"] or {}).get("langs") or {}).get(code)
+    row = body.get("row")
+    if not one or not isinstance(row, int) or not 0 <= row < len(one["rows"]):
+        raise ServiceError("直す所が見つかりません")
+    if not text:
+        raise ServiceError("訳が空です")
+    translate.fix(one, row, text[:500])
+    with _lock:
+        path = _i18n_path(form_id)
+        with open(path + ".tmp", "w", encoding="utf-8") as f:
+            json.dump(state["draft"], f, ensure_ascii=False)
+        os.replace(path + ".tmp", path)
+    return translation(form_id, defs)
+
+
+def publish_translation(body, defs, def_dir):
+    """人が確かめた訳を definitions/i18n/ に置く（患者さんの画面に、その言語のボタンが出る）。"""
+    form_id, code = str(body.get("form_id", "")), str(body.get("lang", ""))
+    defn = _published(defs, form_id)
+    state = translation(form_id, defs)
+    one = ((state["draft"] or {}).get("langs") or {}).get(code)
+    if not one:
+        raise ServiceError("この言語の訳がありません。先に訳を作ってください")
+    if state["stale"]:
+        raise ServiceError("訳を作ったあとで問診票の言葉が変わっています。訳を作り直してください")
+    try:
+        definitions.check_i18n(defn, one["file"])
+    except definitions.DefinitionError as e:
+        raise ServiceError(str(e)) from e
+    folder = os.path.join(def_dir, "i18n")
+    os.makedirs(folder, exist_ok=True)
+    path = os.path.join(folder, f"{form_id}.{code}.yaml")
+    head = (f"# 「{defn['title']}」の {translate.LANGS[code]} の画面（患者さんに見せる言葉の訳）。\n"
+            "# Claude が訳し、人が確かめて公開したもの。label はもとの日本語（変えない）。訳は text と detail。\n"
+            "# 問診票の言葉を変えたら、この訳は使われなくなる（作る画面の「外国語」で作り直す）。\n")
+    with open(path + ".tmp", "w", encoding="utf-8", newline="\n") as f:
+        f.write(head + yamlmini.dump(one["file"]))
+    os.replace(path + ".tmp", path)
+    return {"ok": True, "file": "i18n/" + os.path.basename(path), "name": translate.LANGS[code]}
 
 
 def info():

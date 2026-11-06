@@ -205,6 +205,7 @@ questions:
     tag: "アレルギー"
     options:
       - label: "ある"
+        alert: true
         karte: "あり"
       - label: "ない"
         karte: "なし"
@@ -215,6 +216,7 @@ questions:
     text: "アレルギーのある食べ物を、すべて選んでください。"
     karte: "食物アレルギー 原因食品"
     tag: "アレルギー"
+    alert: true
     options:
       - label: "卵"
       - label: "牛乳"
@@ -239,6 +241,7 @@ questions:
     tag: "アレルギー"
     options:
       - label: "ある"
+        alert: true
         karte: "あり"
         detail: "薬の名前を教えてください"
       - label: "ない"
@@ -275,7 +278,9 @@ questions:
     tag: "基本情報"
     options:
       - label: "妊娠中"
+        alert: true
       - label: "授乳中"
+        alert: true
       - label: "妊娠していない"
         karte: "妊娠なし"
       - label: "わからない"

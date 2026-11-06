@@ -29,6 +29,8 @@ SHOTS = [                           # ファイル名、画面の大きさ、URL
     ("patient_choice.png", "1024,768", "/?try=1&at=onset", None),
     ("patient_number.png", "1024,768", "/?try=1&at=temp_now", None),
     ("karte.png", "1024,768", "/karte?pcode=9000007", None),
+    ("karte_alert.png", "1024,620", "/karte?pcode=9000004", None),          # 要確認の印が付く人（妊娠中）
+    ("admin_lang.png", "1440,1700", f"/admin?form={FORM}&tab=lang", (590, 545, 1418, 1700)),
 ]
 
 

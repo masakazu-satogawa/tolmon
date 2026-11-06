@@ -1,6 +1,6 @@
 """回答をカルテ貼り付け用の文章と、開示用の「設問と回答」に整える（AIは使わない）。"""
 
-from . import body
+from . import body, lang
 from .definitions import TAGS
 
 MAIN_SUFFIX = "（いちばんつらい）"
@@ -81,6 +81,29 @@ def karte_value(q, a):
     return str(v).strip()
 
 
+def alerts(defn, answers):
+    """要確認の印。定義で alert: true にした選択肢（設問に付けたときは、その設問の全部の選択肢）を
+    選んだ回答を、「項目名：値」で返す。どの答えに印を付けるかは病院が決める。アプリは判断しない。"""
+    out = []
+    for q in defn["questions"]:
+        if q["type"] not in ("single", "multi") or not is_visible(q, answers):
+            continue
+        a = answers.get(q["id"]) or {}
+        v = a.get("value")
+        details = a.get("details") or {}
+        parts = []
+        for label in (v if isinstance(v, list) else ([v] if v else [])):
+            o = _option(q, label) or {}
+            if not (o.get("alert") or (q.get("alert") and o.get("alert") is not False)):
+                continue
+            d = (details.get(label) or "").strip() or (TALK_KARTE if o.get("detail") else "")
+            s = o.get("karte") or label
+            parts.append(f"{s}（{d}）" if d else s)
+        if parts:
+            out.append(f"{q['karte']}：" + "、".join(parts))
+    return out
+
+
 def body_main(q, a):
     """人体シェーマで「いちばんつらいところ」があればその部位名（1か所だけならその部位）。"""
     if not a or q["type"] != "body":
@@ -136,6 +159,8 @@ def karte_text(defn, answers, when):
             if main:
                 many = len(answers[q["id"]].get("value") or []) >= 2
                 groups["主訴"].insert(0, main + (MAIN_SUFFIX if many else ""))
+                if not many:
+                    continue                    # 1か所だけなら主訴に出ているので、同じ部位をもう一度は書かない
         groups[tag].append(val if label == tag else f"{label}：{val}")
     lines = [f"【問診】{defn['title']}　{when}"]
     for tag in TAGS:
@@ -144,11 +169,48 @@ def karte_text(defn, answers, when):
     return "\n".join(lines)
 
 
-def shown_questions(defn, answers):
-    """患者に表示した設問とその回答（開示用スナップショット）。"""
+def shown_value(q, a, tr, words, code):
+    """外国語の画面で、患者さんに見えていた言葉のままの回答。"""
+    if not a:
+        return words["no_answer"]
+    v = a.get("value")
+    details = a.get("details") or {}
+
+    def with_detail(s, d):
+        d = (d or "").strip()
+        return f"{s}{words['lp']}{d}{words['rp']}" if d else s
+
+    if q["type"] == "body":
+        if not v:
+            return words["no_answer"]
+        main = a.get("main") if len(v) >= 2 else None
+        return words["sep"].join(lang.body_label(x, code) + (words["main_suffix"] if x == main else "") for x in v)
+    if q["type"] in ("single", "multi"):
+        labels = v if isinstance(v, list) else ([v] if v else [])
+        if not labels:
+            return words["no_answer"]
+        opts = tr.get("o") or {}
+        return words["sep"].join(with_detail((opts.get(x) or {}).get("t") or x, details.get(x)) for x in labels)
+    if v is None or str(v).strip() == "":
+        return words["talk"] if a.get("talk") else words["no_answer"]
+    if q["type"] == "number":
+        return f"{v} {tr.get('unit') or q.get('unit', '')}".strip()
+    return str(v)
+
+
+def shown_questions(defn, answers, code=None):
+    """患者に表示した設問とその回答（開示用スナップショット）。
+    外国語の画面で答えたときは、見えていた言葉（text_shown / answer_shown）も残す。"""
+    tr_all = (defn.get("_i18n") or {}).get(code) if code else None
     out = []
     for q in defn["questions"]:
         if not is_visible(q, answers):
             continue
-        out.append({"id": q["id"], "text": q["text"], "answer": patient_value(q, answers.get(q["id"]))})
+        a = answers.get(q["id"])
+        row = {"id": q["id"], "text": q["text"], "answer": patient_value(q, a)}
+        if tr_all:
+            tr = tr_all["q"].get(q["id"]) or {}
+            row["text_shown"] = tr.get("text") or q["text"]
+            row["answer_shown"] = shown_value(q, a, tr, lang.ui(code), code)
+        out.append(row)
     return out

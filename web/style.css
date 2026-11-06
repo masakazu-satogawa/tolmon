@@ -215,3 +215,12 @@ textarea:focus, .q-input:focus { outline: 3px solid var(--accent); border-color:
   .confirm-grid { grid-template-columns: 1fr; }
   .fs-label { display: none; }
 }
+
+/* 外国語の画面を選ぶボタン（はじめの画面の上。訳がある問診票だけ出る） */
+.lang-switch { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.lang-switch button {
+  min-height: 52px; padding: 8px 22px; border-radius: 999px; border: 2px solid var(--line); background: var(--card);
+  font-size: 18px; font-weight: 700; cursor: pointer;
+}
+.lang-switch button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.pre { white-space: pre-line; }

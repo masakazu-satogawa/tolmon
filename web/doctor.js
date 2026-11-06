@@ -23,8 +23,17 @@ function today() {
   function p(n) { return (n < 10 ? "0" : "") + n; }
   return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
 }
-function api(path) {
-  return fetch(path).catch(function () {
+// 回答にかかった時間（秒）を「3分12秒」の形にする
+function secondsText(n) {
+  if (n === null || n === undefined) return "";
+  return n >= 60 ? Math.floor(n / 60) + "分" + (n % 60) + "秒" : n + "秒";
+}
+var LANG_NAMES = { en: "English", "zh-TW": "繁體中文" };
+
+function api(path, body) {
+  var opts = body === undefined ? undefined
+    : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+  return fetch(path, opts).catch(function () {
     throw new Error("トルモンのサーバーにつながりません");
   }).then(function (res) {
     return res.json().catch(function () { return {}; }).then(function (data) {
@@ -47,25 +56,44 @@ function recordView(rec, withHeader) {
   var karte = el("textarea", { "class": "d-karte", spellcheck: "false", "aria-label": "カルテ貼り付け用テキスト" });
   karte.value = rec.karte_text;
   var copyBtn = el("button", { "class": "d-btn primary", type: "button" }, "カルテ貼り付け用にコピー");
-  copyBtn.addEventListener("click", function () { copyText(karte); });
+  copyBtn.addEventListener("click", function () {
+    copyText(karte);
+    // だれ（どの端末）がコピーしたかを残す。失敗してもコピーは止めない
+    api("/api/answers/" + encodeURIComponent(rec.record_id) + "/copied", {}).catch(function () {});
+  });
 
   var qa = el("ol");
   rec.shown.forEach(function (s) {
     var empty = s.answer === "（未回答）";
-    qa.appendChild(el("li", {}, el("div", { "class": "q" }, s.text), el("div", { "class": "a" + (empty ? " empty" : "") }, s.answer)));
+    var li = el("li", {}, el("div", { "class": "q" }, s.text), el("div", { "class": "a" + (empty ? " empty" : "") }, s.answer));
+    // 外国語の画面で答えたとき：患者さんに見えていた言葉も並べる
+    if (s.text_shown) li.appendChild(el("div", { "class": "shown" }, s.text_shown + " → " + s.answer_shown));
+    qa.appendChild(li);
   });
+
+  // 要確認の印：病院が決めた答え（アレルギーあり・妊娠中など）を、いちばん上に出す。判断はしない
+  var alerts = null;
+  if (rec.alerts && rec.alerts.length) {
+    var ul = el("ul");
+    rec.alerts.forEach(function (t) { ul.appendChild(el("li", {}, t)); });
+    alerts = el("div", { "class": "d-alert" }, el("span", { "class": "d-alert-head" }, "要確認"), ul);
+  }
 
   var meta = el("p", { "class": "d-meta" });
   if (withHeader) meta.appendChild(el("span", {}, "患者ID ", el("b", {}, rec.pcode)));
   meta.appendChild(el("span", {}, rec.form_title));
   meta.appendChild(el("span", {}, "受付番号 " + rec.number));
   meta.appendChild(el("span", {}, "送信 " + rec.created_at.replace("T", " ").slice(0, 16)));
+  if (rec.seconds !== null && rec.seconds !== undefined) meta.appendChild(el("span", {}, "回答時間 " + secondsText(rec.seconds)));
+  if (rec.lang) meta.appendChild(el("span", { "class": "d-lang" }, (LANG_NAMES[rec.lang] || rec.lang) + " の画面で回答"));
 
   var box = el("div", { "class": "k-record" },
-    meta,
-    el("div", { "class": "d-sec-head" }, el("h2", {}, "カルテ貼り付け用"), copyBtn),
+    meta);
+  if (alerts) box.appendChild(alerts);
+  [el("div", { "class": "d-sec-head" }, el("h2", {}, "カルテ貼り付け用"), copyBtn),
     karte,
-    el("details", { "class": "d-qa" }, el("summary", {}, "患者さんに表示した設問と回答（原文）"), qa));
+    el("details", { "class": "d-qa" }, el("summary", {}, "患者さんに表示した設問と回答（原文）"), qa)
+  ].forEach(function (x) { box.appendChild(x); });
   setTimeout(function () { fitHeight(karte); }, 0);
   return box;
 }
@@ -126,13 +154,19 @@ function loadList() {
         "aria-current": String(r.record_id === D.selected) },
         el("span", { "class": "t" }, r.created_at.slice(11, 16)),
         el("span", { "class": "p" }, r.pcode),
-        el("span", { "class": "f" }, r.form_title + "　受付 " + r.number));
+        el("span", { "class": "f" }, r.form_title + "　受付 " + r.number + (r.lang ? "　" + (LANG_NAMES[r.lang] || r.lang) : "")));
       b.addEventListener("click", function () { openRecord(r.record_id); });
       list.appendChild(el("li", {}, b));
       known[r.record_id] = true;
     });
     D.known = known;
-    $("list-count").textContent = rows.length ? rows.length + "件（新しい順）" : "この条件の問診はまだありません";
+    // 回答にかかった時間の平均（計れた分だけ）
+    var timed = rows.filter(function (r) { return r.seconds !== null && r.seconds !== undefined; });
+    var sum = 0;
+    timed.forEach(function (r) { sum += r.seconds; });
+    $("list-count").textContent = rows.length
+      ? rows.length + "件（新しい順）" + (timed.length ? "　回答時間の平均 " + secondsText(Math.round(sum / timed.length)) + "（" + timed.length + "件）" : "")
+      : "この条件の問診はまだありません";
   }).catch(function (e) { $("list-count").textContent = e.message; });
 }
 
@@ -152,6 +186,34 @@ function openRecord(id) {
     var detail = $("d-detail");
     clear(detail);
     detail.appendChild(el("p", { "class": "warn" }, e.message));
+  });
+}
+
+// ---------------------------------------------------------------- 閲覧の記録（どの端末が、いつ、どの問診を開いた・コピーした）
+function openAccess() {
+  D.selected = null;
+  var items = document.querySelectorAll(".d-item");
+  for (var i = 0; i < items.length; i++) items[i].setAttribute("aria-current", "false");
+  var day = $("f-date").value;
+  api("/api/access" + (day ? "?date=" + encodeURIComponent(day) : "")).then(function (data) {
+    var detail = $("d-detail");
+    clear(detail);
+    detail.appendChild(el("h2", { "class": "k-title" }, el("span", {}, "閲覧の記録"),
+      el("span", { "class": "day" }, (day ? day.replace(/-/g, "/") : "すべての日") + "　" + data.records.length + "件（新しい順）")));
+    detail.appendChild(el("p", { "class": "d-empty" }, "問診を開いた・コピーした・患者IDを登録した端末と時刻です。職員のログインはまだ無いので、端末のアドレスまでを残しています。"));
+    if (!data.records.length) return;
+    var table = el("table", { "class": "r-table" }, el("tr", {},
+      el("th", {}, "時刻"), el("th", {}, "操作"), el("th", {}, "患者ID"), el("th", {}, "問診"), el("th", {}, "端末")));
+    data.records.forEach(function (r) {
+      table.appendChild(el("tr", {},
+        el("td", {}, r.at.replace("T", " ")), el("td", {}, data.actions[r.action] || r.action),
+        el("td", {}, r.pcode || "（未登録）"), el("td", {}, (r.form_title || "") + (r.number ? "　受付 " + r.number : "")),
+        el("td", {}, r.ip || "")));
+    });
+    detail.appendChild(table);
+  }).catch(function (e) {
+    clear($("d-detail"));
+    $("d-detail").appendChild(el("p", { "class": "warn" }, e.message));
   });
 }
 
@@ -200,6 +262,7 @@ if (D.karteMode) {
     loadList();
   });
   $("btn-refresh").addEventListener("click", loadList);
+  $("btn-access").addEventListener("click", openAccess);
   loadList();
   setInterval(loadList, 10000);  // 新しい問診が届いたら一覧に出す
 }

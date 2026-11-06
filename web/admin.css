@@ -147,3 +147,22 @@ body.admin { font-size: 15px; background: var(--bg); overflow: visible; }
   .a-paper { position: static; }
   .a-paper-box { height: 60vh; }
 }
+
+/* 設問カード：要確認の印を付けた選択肢 */
+.q-opts .al { margin-left: 8px; background: var(--warn); color: #fff; border-radius: 6px; padding: 0 8px; font-size: .75rem; font-weight: 700; white-space: nowrap; }
+
+/* 外国語：もとの日本語／日本語に戻したもの／訳 を並べる */
+.l-lang { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 12px; }
+.l-lang h3 { margin: 0 0 4px; }
+.l-lang details summary { cursor: pointer; color: var(--muted); font-weight: 700; margin: 8px 0; }
+.l-table { width: 100%; border-collapse: collapse; font-size: .9rem; table-layout: fixed; }
+.l-table th, .l-table td { border-bottom: 1px solid var(--line); padding: 5px 8px; text-align: left; vertical-align: top; }
+.l-table th { color: var(--muted); font-size: .8rem; background: var(--bg); position: sticky; top: 0; }
+.l-table th:first-child, .l-table td.w { width: 64px; color: var(--muted); font-size: .75rem; white-space: nowrap; }
+.l-table tr.q td { font-weight: 700; background: #fafbfa; }
+.l-table tr.error td { background: var(--warn-soft); }
+.l-table tr.warning td { background: #fdf6e3; }
+.l-table tr.note td { font-size: .85rem; border-bottom: 2px solid var(--line); }
+.l-table tr.note.error td { color: var(--warn); }
+.l-edit { float: right; margin-left: 8px; border: 1px solid var(--line); background: var(--card); border-radius: 6px; padding: 0 8px; font-size: .75rem; cursor: pointer; color: var(--muted); }
+.l-table td.fixed { color: var(--muted); font-size: .8rem; }

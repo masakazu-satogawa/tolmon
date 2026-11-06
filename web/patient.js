@@ -32,6 +32,7 @@ var S = {
   bodyLabels: {},    // 部位id → 表示名（サーバーから）
   fromReview: false,
   startedAt: null,
+  startedMs: null,   // 「はじめる」を押した時刻（回答にかかった時間を計る）
   pending: null,     // 送信後の { record_id, number }
   lastActive: Date.now(),
   idleShownAt: null,
@@ -44,9 +45,66 @@ function localIso(d) {
   return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + "T" + p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
 }
 
+// ---------------------------------------------------------------- 言語（日本語・English・繁體中文）
+// 決まった言葉（ボタン・案内）と体の部位名は /api/lang から、設問と選択肢の訳は問診票ごとの _i18n から。
+// 訳すのは画面に出す言葉だけ。サーバーに送る回答は日本語の選択肢名のままなので、カルテの文は日本語で出る。
+var L = { data: null, code: "ja" };
+function T(key, n) {
+  var ui = L.data ? (L.data.ui[L.code] || L.data.ui.ja) : {};
+  var text = ui[key] !== undefined ? ui[key] : key;
+  return n === undefined ? text : text.replace("{n}", n);
+}
+function qTr(q) {
+  var t = S.form && S.form._i18n && S.form._i18n[L.code];
+  return (t && t.q[q.id]) || {};
+}
+function qText(q) { return qTr(q).text || q.text; }
+function qHint(q) { return q.hint ? (qTr(q).hint || q.hint) : ""; }
+function qUnit(q) { return q.unit ? (qTr(q).unit || q.unit) : ""; }
+function oText(q, o) { var x = (qTr(q).o || {})[o.label]; return (x && x.t) || o.label; }
+function oDetail(q, o) { var x = (qTr(q).o || {})[o.label]; return (x && x.d) || o.detail; }
+function labelText(q, label) {
+  var o = q.options.filter(function (x) { return x.label === label; })[0];
+  return o ? oText(q, o) : label;
+}
+// 画面に出ている決まった言葉（data-t の付いた要素）を、いまの言語に入れ替える
+function applyLang() {
+  if (!L.data) return;
+  document.documentElement.lang = L.data.html_lang[L.code] || "ja";
+  var nodes = document.querySelectorAll("[data-t]");
+  for (var i = 0; i < nodes.length; i++) nodes[i].textContent = T(nodes[i].getAttribute("data-t"));
+  var btns = document.querySelectorAll("#lang-switch button");
+  for (var j = 0; j < btns.length; j++) btns[j].setAttribute("aria-pressed", String(btns[j].getAttribute("data-lang") === L.code));
+  if (S.form) $("welcome-count").textContent = T("welcome_count", visibleQuestions().length);
+}
+function setLang(code) {
+  L.code = code;
+  applyLang();
+}
+// この問診票に訳がある言語だけ、はじめの画面にボタンを出す（訳がなければ何も出さない）
+function renderLangSwitch() {
+  var box = $("lang-switch");
+  clear(box);
+  var have = (S.form && S.form._i18n) || {};
+  var list = L.data ? L.data.langs.filter(function (x) { return x.id === "ja" || have[x.id]; }) : [];
+  box.hidden = list.length < 2;
+  if (list.length < 2) return;
+  list.forEach(function (x) {
+    var b = el("button", { type: "button", "data-lang": x.id, lang: L.data.html_lang[x.id] || "ja" }, x.name);
+    b.addEventListener("click", function () { setLang(x.id); });
+    box.appendChild(b);
+  });
+}
+// 言葉の見た目の長さ（英数字は半分の幅として数える）。選択肢を何列に並べるかを決めるのに使う
+function width(text) {
+  var n = 0;
+  for (var i = 0; i < text.length; i++) n += text.charCodeAt(i) > 0xff ? 1 : 0.5;
+  return n;
+}
+
 function api(path, opts) {
   return fetch(path, opts).catch(function () {
-    throw new Error("通信できませんでした。職員に声をかけてください。");
+    throw new Error(T("err_net"));
   }).then(function (res) {
     return res.json().catch(function () { return {}; }).then(function (data) {
       if (!res.ok) throw new Error(data.error || "通信できませんでした");
@@ -100,6 +158,9 @@ function patientMode() { return PATIENT_SCREENS.indexOf(S.screen) >= 0; }
 function initReception() {
   return api("/api/config").then(function (cfg) {
     S.cfg = cfg;
+    return api("/api/lang");
+  }).then(function (lang) {
+    L.data = lang;
     return api("/api/body");
   }).then(function (b) {
     S.bodyLabels = b.regions;
@@ -110,7 +171,10 @@ function initReception() {
     clear(list);
     S.forms.forEach(function (f) {
       var b = el("button", { "class": "choice form-choice", type: "button" },
-        el("span", {}, f.title, el("span", { "class": "small" }, f.count + "問")));
+        el("span", {}, f.title, el("span", { "class": "small" }, f.count + "問" +
+          ((f.langs || []).length ? "　" + ["日本語"].concat(f.langs.map(function (c) {
+            return (L.data.langs.filter(function (x) { return x.id === c; })[0] || {}).name || c;
+          })).join("・") : ""))));
       b.addEventListener("click", function () { startForm(f.id); });
       list.appendChild(b);
     });
@@ -123,7 +187,9 @@ function beginForm(form) {
   S.form = form;
   S.answers = {};
   S.startedAt = localIso(new Date());
-  $("welcome-count").textContent = "質問はおよそ " + visibleQuestions().length + " 問です。";
+  S.startedMs = null;
+  renderLangSwitch();
+  setLang("ja");
   setFontSize("m");
   touch();
   show("welcome");
@@ -137,6 +203,9 @@ function startTrial() {
   $("trial-badge").hidden = false;
   return api("/api/config").then(function (cfg) {
     S.cfg = cfg;
+    return api("/api/lang");
+  }).then(function (lang) {
+    L.data = lang;
     return api("/api/body");
   }).then(function (b) {
     S.bodyLabels = b.regions;
@@ -178,7 +247,10 @@ function hasAnswer(q) {
 }
 
 // ---------------------------------------------------------------- 1問ずつ
-$("btn-begin").addEventListener("click", function () { goTo(visibleQuestions()[0].id); });
+$("btn-begin").addEventListener("click", function () {
+  if (!S.startedMs) S.startedMs = Date.now();
+  goTo(visibleQuestions()[0].id);
+});
 
 function goTo(qid) {
   S.current = qid;
@@ -193,15 +265,15 @@ function renderQuestion() {
   var pos = indexOfId(qs, q.id) + 1;
   $("progress-text").textContent = pos + " / " + qs.length;
   $("progress-bar").style.width = ((pos - 1) / qs.length) * 100 + "%";
-  $("q-text").textContent = q.text;
+  $("q-text").textContent = qText(q);
   $("q-hint").hidden = !q.hint;
-  $("q-hint").textContent = q.hint || "";
+  $("q-hint").textContent = qHint(q);
   $("q-msg").hidden = true;
   var body = $("q-body");
   clear(body);
   body.className = "q-body" + (q.type === "body" && S.sub !== "main" ? " is-body" : "");
   var a = S.answers[q.id] || {};
-  $("btn-back").textContent = S.fromReview ? "確認画面へ" : "もどる";
+  $("btn-back").textContent = S.fromReview ? T("to_review") : T("back");
 
   if (q.type === "body") {
     if (S.sub === "main") renderBodyMain(q, a, body);
@@ -213,13 +285,13 @@ function renderQuestion() {
     var chosen = multi ? (a.value || []) : (a.value ? [a.value] : []);
     // 選択肢が多いときは2列・3列に並べる（言葉が短いときだけ）
     var longest = 0;
-    q.options.forEach(function (o) { longest = Math.max(longest, o.label.length); });
+    q.options.forEach(function (o) { longest = Math.max(longest, width(oText(q, o))); });
     if (q.options.length >= 13 && longest <= 7) body.className += " cols3";
     else if (q.options.length >= 6 && longest <= 20) body.className += " cols2" + (q.options.length >= 13 ? " dense" : "");
     q.options.forEach(function (o, idx) {
       var on = chosen.indexOf(o.label) >= 0;
       var btn = el("button", { "class": "choice" + (multi ? " multi" : ""), type: "button", "aria-pressed": String(on) },
-        el("span", { "class": "mark" }, "✓"), el("span", {}, o.label));
+        el("span", { "class": "mark" }, "✓"), el("span", {}, oText(q, o)));
       btn.addEventListener("click", function () { choose(q, o.label); });
       body.appendChild(btn);
       if (on && o.detail) {
@@ -231,24 +303,24 @@ function renderQuestion() {
           cur.details = cur.details || {};
           cur.details[o.label] = ta.value;
         });
-        body.appendChild(el("div", { "class": "detail" }, el("label", { "for": id }, o.detail), ta,
-          el("p", { "class": "detail-note" }, "書かなくてもかまいません。診察のときにお話しください。")));
+        body.appendChild(el("div", { "class": "detail" }, el("label", { "for": id }, oDetail(q, o)), ta,
+          el("p", { "class": "detail-note" }, T("detail_note"))));
       }
     });
   } else if (q.type === "number") {
     renderNumber(q, a, body);
   } else if (q.type === "time") {
-    var t = el("input", { "class": "q-input", type: "time", "aria-label": q.text });
+    var t = el("input", { "class": "q-input", type: "time", "aria-label": qText(q) });
     t.value = a.value || "";
     t.addEventListener("input", function () { setValue(q, t.value); });
     t.addEventListener("change", function () { setValue(q, t.value); });
     body.appendChild(t);
   } else {
     // 自由に書く欄。文字を打つのが難しい人のために、「診察のときに話します」で先へ進めるようにする
-    var ta2 = el("textarea", { "aria-label": q.text });
+    var ta2 = el("textarea", { "aria-label": qText(q) });
     ta2.value = a.value || "";
     var talk = el("button", { "class": "choice talk", type: "button", "aria-pressed": String(!!a.talk) },
-      el("span", { "class": "mark" }, "✓"), el("span", {}, "書かずに、診察のときに話します"));
+      el("span", { "class": "mark" }, "✓"), el("span", {}, T("talk_btn")));
     ta2.addEventListener("input", function () {
       setValue(q, ta2.value);
       talk.setAttribute("aria-pressed", "false");
@@ -276,11 +348,11 @@ function wantsDecimal(q) {
 function renderNumber(q, a, body) {
   var cur = numberText(q);
   body.appendChild(el("div", { "class": "num-display" + (cur ? "" : " empty"), "aria-live": "polite" },
-    el("span", { "class": "num-value" }, cur || "　"), el("span", { "class": "unit" }, q.unit || "")));
+    el("span", { "class": "num-value" }, cur || "　"), el("span", { "class": "unit" }, qUnit(q))));
   var pad = el("div", { "class": "numpad" });
   ["1", "2", "3", "4", "5", "6", "7", "8", "9", wantsDecimal(q) ? "." : "", "0", "del"].forEach(function (k) {
     if (!k) { pad.appendChild(el("span", {})); return; }
-    var b = el("button", { "class": "num-key" + (k === "del" ? " del" : ""), type: "button" }, k === "del" ? "1文字消す" : k);
+    var b = el("button", { "class": "num-key" + (k === "del" ? " del" : ""), type: "button" }, k === "del" ? T("del") : k);
     b.addEventListener("click", function () { pressNumber(q, k); });
     pad.appendChild(b);
   });
@@ -306,14 +378,14 @@ document.addEventListener("keydown", function (ev) {
 });
 
 // ---------------------------------------------------------------- 人体シェーマ
-function bodyLabel(id) { return S.bodyLabels[id] || id; }
+function bodyLabel(id) { return ((L.data && L.data.body[L.code]) || {})[id] || S.bodyLabels[id] || id; }
 
 function renderBody(q, a, body) {
   var views = TolmonBody.views.filter(function (v) { return !q.views || q.views.indexOf(v.id) >= 0; });
   var current = S.bodyView[q.id] || views[0].id;
   var tabs = el("div", { "class": "body-tabs" });
   views.forEach(function (v) {
-    var b = el("button", { "class": "body-tab", type: "button", "aria-pressed": String(v.id === current) }, v.label);
+    var b = el("button", { "class": "body-tab", type: "button", "aria-pressed": String(v.id === current) }, T("view_" + v.id));
     b.addEventListener("click", function () { S.bodyView[q.id] = v.id; renderQuestion(); });
     tabs.appendChild(b);
   });
@@ -321,13 +393,28 @@ function renderBody(q, a, body) {
   var selected = {};
   (a.value || []).forEach(function (id) { selected[id] = true; });
   TolmonBody.draw(current, box, selected, function (id) { toggleBody(q, id); }, bodySex(q));
+  translateFigure(box);
   var picked = a.value || [];
   var list = el("p", { "class": "body-selected" + (picked.length ? "" : " empty") },
-    picked.length ? "選んだところ：" + picked.map(bodyLabel).join("、") : "図をタップして選んでください");
+    picked.length ? T("body_picked") + picked.map(bodyLabel).join(T("sep")) : T("body_tap"));
   body.appendChild(tabs);
   body.appendChild(box);
   body.appendChild(list);
   updateNext(q);
+}
+
+// 図の中の文字（右側・左側・右手のひら など）を、いまの言語にする
+var FIGURE_WORDS = { "右側": "fig_right", "左側": "fig_left", "頭の後ろ": "fig_head_back", "顔": "fig_face" };
+function translateFigure(box) {
+  if (L.code === "ja") return;
+  var ids = {};
+  Object.keys(S.bodyLabels).forEach(function (id) { ids[S.bodyLabels[id]] = id; });
+  var texts = box.querySelectorAll("text");
+  for (var i = 0; i < texts.length; i++) {
+    var ja = texts[i].textContent;
+    if (FIGURE_WORDS[ja]) texts[i].textContent = T(FIGURE_WORDS[ja]);
+    else if (ids[ja]) texts[i].textContent = bodyLabel(ids[ja]);
+  }
 }
 
 // 図の男女：性別の設問（既定は id "sex"）で「女性」と答えていれば女性の図。答えていなければ男性の図
@@ -349,9 +436,9 @@ function toggleBody(q, id) {
 
 // 2か所以上選んだときだけ：「いちばんつらいところ」を1つ選ぶ（紙の問診票の意図＝主訴を知る）
 function renderBodyMain(q, a, body) {
-  $("q-text").textContent = "いちばんつらいのは、どこですか？";
+  $("q-text").textContent = T("body_main_q");
   $("q-hint").hidden = false;
-  $("q-hint").textContent = "選んだところの中から、1つ選んでください";
+  $("q-hint").textContent = T("body_main_hint");
   (a.value || []).forEach(function (id) {
     var btn = el("button", { "class": "choice", type: "button", "aria-pressed": String(a.main === id) },
       el("span", { "class": "mark" }, "✓"), el("span", {}, bodyLabel(id)));
@@ -359,8 +446,8 @@ function renderBodyMain(q, a, body) {
     body.appendChild(btn);
   });
   $("btn-next").disabled = !a.main;
-  $("btn-next").textContent = "次へ";
-  $("btn-back").textContent = "図にもどる";
+  $("btn-next").textContent = T("next");
+  $("btn-back").textContent = T("to_figure");
 }
 
 function setValue(q, v) {
@@ -393,7 +480,7 @@ function choose(q, label) {
 function updateNext(q) {
   var answered = hasAnswer(q);
   $("btn-next").disabled = !!q.required && !answered;
-  $("btn-next").textContent = answered || q.required ? "次へ" : "答えずに次へ";
+  $("btn-next").textContent = answered || q.required ? T("next") : T("skip");
 }
 
 function checkCurrent(q) {
@@ -401,9 +488,9 @@ function checkCurrent(q) {
     // 「36.」のように小数点で終わっていたら、点を取る
     S.answers[q.id].value = String(S.answers[q.id].value).replace(/\.$/, "");
     var n = toNum(S.answers[q.id].value);
-    if (n === null) return "数字で入力してください";
-    if (q.min !== undefined && n < q.min) return q.min + " 以上の数字を入力してください";
-    if (q.max !== undefined && n > q.max) return q.max + " 以下の数字を入力してください";
+    if (n === null) return T("err_number");
+    if (q.min !== undefined && n < q.min) return T("err_min", q.min);
+    if (q.max !== undefined && n > q.max) return T("err_max", q.max);
   }
   return null;
 }
@@ -459,19 +546,19 @@ $("btn-back").addEventListener("click", function () {
 function answerText(q) {
   if (!hasAnswer(q)) return null;
   var a = S.answers[q.id];
-  if (a.talk) return "診察のときに話します";
+  if (a.talk) return T("talk");
   if (q.type === "body") {
     var many = a.value.length >= 2;
-    return a.value.map(function (id) { return bodyLabel(id) + (many && id === a.main ? "（いちばんつらい）" : ""); }).join("、");
+    return a.value.map(function (id) { return bodyLabel(id) + (many && id === a.main ? T("main_suffix") : ""); }).join(T("sep"));
   }
   if (q.type === "single" || q.type === "multi") {
     var labels = Array.isArray(a.value) ? a.value : [a.value];
     return labels.map(function (l) {
       var d = ((a.details || {})[l] || "").trim();
-      return d ? l + "（" + d + "）" : l;
-    }).join("、");
+      return d ? labelText(q, l) + T("lp") + d + T("rp") : labelText(q, l);
+    }).join(T("sep"));
   }
-  if (q.type === "number") return (a.value + " " + (q.unit || "")).trim();
+  if (q.type === "number") return (a.value + " " + qUnit(q)).trim();
   return a.value;
 }
 
@@ -480,10 +567,10 @@ function openReview() {
   clear(list);
   visibleQuestions().forEach(function (q) {
     var t = answerText(q);
-    var fix = el("button", { "class": "btn", type: "button" }, "なおす");
+    var fix = el("button", { "class": "btn", type: "button" }, T("fix"));
     fix.addEventListener("click", function () { S.fromReview = true; goTo(q.id); });
     list.appendChild(el("li", {},
-      el("div", { "class": "grow" }, el("div", { "class": "rq" }, q.text), el("div", { "class": "ra" + (t ? "" : " empty") }, t || "（答えていません）")),
+      el("div", { "class": "grow" }, el("div", { "class": "rq" }, qText(q)), el("div", { "class": "ra" + (t ? "" : " empty") }, t || T("no_answer"))),
       fix));
   });
   $("submit-msg").hidden = true;
@@ -498,7 +585,7 @@ $("btn-review-back").addEventListener("click", function () {
 $("btn-submit").addEventListener("click", function () {
   var btn = $("btn-submit");
   btn.disabled = true;
-  btn.textContent = "送っています…";
+  btn.textContent = T("sending");
   // 表示されていない設問の回答は送らない
   var answers = {};
   visibleQuestions().forEach(function (q) { if (hasAnswer(q)) answers[q.id] = S.answers[q.id]; });
@@ -509,7 +596,8 @@ $("btn-submit").addEventListener("click", function () {
       $("trial-karte").textContent = res.karte;
       show("trial");
     })
-    : post("/api/answers", { form_id: S.form.id, form_hash: S.form._hash, answers: answers, started_at: S.startedAt })
+    : post("/api/answers", { form_id: S.form.id, form_hash: S.form._hash, answers: answers, started_at: S.startedAt,
+      seconds: S.startedMs ? Math.round((Date.now() - S.startedMs) / 1000) : null, lang: L.code === "ja" ? null : L.code })
     .then(function (res) {
       // 送った時点でサーバーに保存済み。タブレットには受付番号だけを出す（回答の中身は消す）
       S.pending = { record_id: res.record_id, number: res.number, title: S.form.title };
@@ -519,12 +607,12 @@ $("btn-submit").addEventListener("click", function () {
     });
   sending
     .catch(function (e) {
-      $("submit-msg").textContent = e.message + "\n係の者をお呼びください。";
+      $("submit-msg").textContent = e.message + "\n" + T("call_staff");
       $("submit-msg").hidden = false;
     })
     .then(function () {
       btn.disabled = false;
-      btn.textContent = "この内容で送る";
+      btn.textContent = T("submit");
     });
 });
 
@@ -594,6 +682,7 @@ function resetAll() {
   $("pcode").value = "";
   ["dlg-confirm", "dlg-idle", "dlg-abort"].forEach(function (d) { $(d).hidden = true; });
   setFontSize("m");
+  setLang("ja");                                   // 次の患者さんは、また日本語から
   if (TRIAL) return startTrial().catch(trialFailed);   // お試しは受付の画面に戻らず、はじめからやり直す
   show("reception");
 }
@@ -631,7 +720,7 @@ setInterval(function () {
   }
   if (S.idleShownAt) {
     var left = Math.ceil(S.cfg.idle_grace_seconds - (now - S.idleShownAt) / 1000);
-    $("idle-count").textContent = Math.max(left, 0);
+    $("idle-text").textContent = T("idle_text", Math.max(left, 0));
     if (left <= 0) resetAll();
   }
 }, 1000);

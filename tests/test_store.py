@@ -7,7 +7,7 @@ ROOT = os.path.join(os.path.dirname(__file__), "..")
 sys.path.insert(0, ROOT)
 from app import definitions, karte, store, yamlmini  # noqa: E402
 
-DEF = definitions.load_file(os.path.join(ROOT, "definitions", "sample_naika.yaml"))
+DEF = definitions.load_file(os.path.join(ROOT, "samples", "definitions", "sample_naika.yaml"))
 REQ = {"symptom": {"value": ["熱がある"]}}  # 必須の設問
 
 

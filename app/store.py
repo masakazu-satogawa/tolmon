@@ -13,7 +13,7 @@ import sqlite3
 import threading
 from datetime import datetime
 
-from . import body, karte
+from . import body, karte, lang
 
 _lock = threading.Lock()
 
@@ -35,9 +35,24 @@ CREATE TABLE IF NOT EXISTS records (
   UNIQUE (day, number)
 );
 CREATE INDEX IF NOT EXISTS idx_records_pcode_day ON records (pcode, day);
+CREATE TABLE IF NOT EXISTS access_log (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  at         TEXT NOT NULL,         -- いつ
+  ip         TEXT,                  -- どの端末から（職員のログインはまだ無いので、端末のアドレスまで）
+  action     TEXT NOT NULL,         -- view（開いた）／ copy（コピーした）／ register（患者IDを登録した）
+  record_id  TEXT,
+  pcode      TEXT,
+  ua         TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_access_at ON access_log (at);
 """
+# あとから足した列（古いデータベースにも足す）
+ADDED_COLUMNS = (("seconds", "INTEGER"),    # 回答にかかった秒数（端末で計った、はじめる〜送信）
+                 ("lang", "TEXT"))          # 患者さんが答えた画面の言語（日本語なら NULL）
 
-LIST_COLUMNS = "record_id, day, number, form_id, form_title, created_at, pcode, registered_at"
+LIST_COLUMNS = "record_id, day, number, form_id, form_title, created_at, pcode, registered_at, seconds, lang"
+ACTIONS = {"view": "開いた", "copy": "コピーした", "register": "患者IDを登録した"}
+VIEW_QUIET_SECONDS = 600                    # 同じ端末が同じ問診を開き直しても、この秒数は「開いた」を重ねて書かない
 
 
 class AnswerError(ValueError):
@@ -61,6 +76,10 @@ def init_db(data_dir):
     with _connect(data_dir) as con:
         con.execute("PRAGMA journal_mode=WAL")
         con.executescript(SCHEMA)
+        have = {r["name"] for r in con.execute("PRAGMA table_info(records)")}
+        for name, kind in ADDED_COLUMNS:
+            if name not in have:
+                con.execute(f"ALTER TABLE records ADD COLUMN {name} {kind}")
     con.close()
 
 
@@ -134,10 +153,14 @@ def save_pending(data_dir, defn, raw_answers, meta):
     now = datetime.now()
     when = now.strftime("%Y/%m/%d %H:%M")
     day = now.strftime("%Y-%m-%d")
+    code = meta.get("lang") if meta.get("lang") in (defn.get("_i18n") or {}) else None
+    seconds = meta.get("seconds")
+    seconds = int(seconds) if isinstance(seconds, (int, float)) and 0 <= seconds <= 86400 else None
     data = {
         "answers": answers,
         "karte_text": karte.karte_text(defn, answers, when),
-        "shown": karte.shown_questions(defn, answers),
+        "alerts": karte.alerts(defn, answers),
+        "shown": karte.shown_questions(defn, answers, code),
         "client": meta.get("client"),
         "form_file": defn.get("_file"),
         "definition_snapshot": {k: v for k, v in defn.items() if not k.startswith("_")},
@@ -151,10 +174,10 @@ def save_pending(data_dir, defn, raw_answers, meta):
                 record_id = f"{now.strftime('%Y%m%d')}-{number:03d}"
                 con.execute(
                     "INSERT INTO records (record_id, day, number, form_id, form_title, form_version, form_hash,"
-                    " created_at, started_at, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    " created_at, started_at, seconds, lang, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (record_id, day, number, defn["id"], defn["title"], str(defn.get("version", "")),
                      defn.get("_hash"), now.isoformat(timespec="seconds"), meta.get("started_at"),
-                     json.dumps(data, ensure_ascii=False)))
+                     seconds, code, json.dumps(data, ensure_ascii=False)))
         finally:
             con.close()
     return {"record_id": record_id, "number": number}
@@ -171,16 +194,25 @@ def _atomic_write(path, text):
     os.replace(tmp, path)
 
 
+def seconds_text(n):
+    return "" if n is None else (f"{n // 60}分{n % 60}秒" if n >= 60 else f"{n}秒")
+
+
 def _disclosure_text(row, data):
     lines = [data["karte_text"], "", "=" * 40, "表示した設問と回答（開示用）", "=" * 40]
     for i, s in enumerate(data["shown"], start=1):
         lines.append(f"Q{i}. {s['text']}")
         lines.append(f"  → {s['answer']}")
+        if s.get("text_shown"):                 # 外国語の画面で答えたとき：患者さんに見えていた言葉
+            lines.append(f"  　（画面の表示）{s['text_shown']}")
+            lines.append(f"  　　→ {s['answer_shown']}")
     lines += [
         "",
         f"患者ID: {row['pcode']}",
         f"受付番号: {row['number']}（{row['day']}）",
         f"問診票: {row['form_title']}（id={row['form_id']} / 版={row['form_version']} / hash={row['form_hash']}）",
+        f"画面の言語: {lang.LANGS.get(row.get('lang'), '日本語')}",
+        f"回答にかかった時間: {seconds_text(row.get('seconds'))}",
         f"開始: {row['started_at'] or ''}",
         f"送信: {row['created_at']}",
         f"患者ID登録: {row['registered_at']}",
@@ -237,6 +269,42 @@ def list_registered(data_dir, day=None, pcode=None):
 
 def list_pending(data_dir, day):
     return _rows(data_dir, f"SELECT {LIST_COLUMNS} FROM records WHERE pcode IS NULL AND day = ? ORDER BY number", (day,))
+
+
+# ---------------------------------------------------------------- 閲覧の記録
+
+def log_access(data_dir, action, record_id, client, pcode=None):
+    """どの端末が、いつ、どの問診に何をしたかを残す。消さない。"""
+    client = client or {}
+    now = datetime.now()
+    with _lock:
+        con = _connect(data_dir)
+        try:
+            with con:
+                if pcode is None:
+                    row = con.execute("SELECT pcode FROM records WHERE record_id = ?", (record_id,)).fetchone()
+                    pcode = row["pcode"] if row else None
+                if action == "view":
+                    last = con.execute("SELECT MAX(at) FROM access_log WHERE action = 'view' AND record_id = ? AND ip IS ?",
+                                       (record_id, client.get("ip"))).fetchone()[0]
+                    if last and (now - datetime.fromisoformat(last)).total_seconds() < VIEW_QUIET_SECONDS:
+                        return False
+                con.execute("INSERT INTO access_log (at, ip, action, record_id, pcode, ua) VALUES (?, ?, ?, ?, ?, ?)",
+                            (now.isoformat(timespec="seconds"), client.get("ip"), action, record_id, pcode,
+                             str(client.get("ua") or "")[:200]))
+        finally:
+            con.close()
+    return True
+
+
+def list_access(data_dir, day=None, limit=300):
+    sql = ("SELECT a.at, a.ip, a.action, a.record_id, a.pcode, r.number, r.form_title FROM access_log a"
+           " LEFT JOIN records r ON r.record_id = a.record_id")
+    args = []
+    if day:
+        sql += " WHERE a.at LIKE ?"
+        args.append(day + "%")
+    return _rows(data_dir, sql + " ORDER BY a.id DESC LIMIT ?", args + [int(limit)])
 
 
 _RID = re.compile(r"^\d{8}-\d{3,}$")

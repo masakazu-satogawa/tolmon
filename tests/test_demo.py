@@ -22,7 +22,7 @@ class DemoTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = self.tmp.name
         os.makedirs(os.path.join(self.root, "definitions"))
-        shutil.copy(os.path.join(ROOT, "definitions", "sample_naika.yaml"), os.path.join(self.root, "definitions"))
+        shutil.copy(os.path.join(ROOT, "samples", "definitions", "sample_naika.yaml"), os.path.join(self.root, "definitions"))
         os.makedirs(os.path.join(self.root, "samples"))
         with open(os.path.join(self.root, "samples", "demo_patients.json"), "w", encoding="utf-8") as f:
             json.dump({"patients": [

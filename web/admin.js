@@ -155,6 +155,7 @@ function showResult(r) {
   $("usage").textContent = parts.join(" ／ ");
   $("save-msg").hidden = true;
   renderDummy(r.dummy || null);
+  loadTranslation();
   setStep(2);
 }
 
@@ -202,6 +203,7 @@ function renderQuestions() {
         if (isAdded) nAdded++;
         ul.appendChild(el("li", isAdded ? { "class": "added" } : {}, o.label,
           o.karte && o.karte !== o.label ? el("span", { "class": "k" }, " → " + o.karte) : null,
+          o.alert || (q.alert && o.alert !== false) ? el("span", { "class": "al" }, "要確認の印") : null,
           o.detail ? el("span", { "class": "d" }, "選ぶと記入欄（書かなくても進める）：" + o.detail) : null));
       });
       li.appendChild(ul);
@@ -324,6 +326,90 @@ $("btn-dummy").addEventListener("click", function () {
     m.className = "a-inline ng";
     m.textContent = e.message;
   }).then(function () { btn.disabled = false; });
+});
+
+// ---------------------------------------------------------------- 外国語（訳す → 日本語に戻す → 比べる → 人が確かめて公開）
+function loadTranslation() {
+  if (!A.formId) return Promise.resolve();
+  return api("/api/creator/translation?form_id=" + encodeURIComponent(A.formId)).then(renderTranslation).catch(function () {});
+}
+function renderTranslation(t) {
+  var state = $("lang-state"), box = $("lang-result"), n = $("n-lang");
+  clear(box);
+  $("btn-translate").disabled = !t.published;
+  var liveNames = t.langs.filter(function (x) { return t.live.indexOf(x.id) >= 0; }).map(function (x) { return x.name; });
+  n.hidden = !liveNames.length;
+  n.textContent = liveNames.length;
+  if (!t.published) {
+    state.textContent = "この問診票は、まだ公開されていません。先に「確定して公開」を押してください（訳すのは、公開した問診票です）。";
+    return;
+  }
+  state.textContent = (liveNames.length ? "いま患者さんの画面に出ている言語：日本語・" + liveNames.join("・") : "いま患者さんの画面に出ているのは、日本語だけです。")
+    + (t.stale ? "　※ 訳を作ったあとで問診票の言葉が変わりました。訳を作り直してください。" : "");
+  if (!t.draft) return;
+  Object.keys(t.draft.errors || {}).forEach(function (code) {
+    box.appendChild(el("p", { "class": "a-msg ng" }, code + " は訳せませんでした：" + t.draft.errors[code]));
+  });
+  t.langs.forEach(function (lang) {
+    var d = t.draft.langs[lang.id];
+    if (!d) return;
+    var live = t.live.indexOf(lang.id) >= 0;
+    var pub = el("button", { "class": "a-btn" + (live ? "" : " primary"), type: "button" }, live ? "この訳で公開し直す" : "確かめたので、この訳を公開する");
+    var msg = el("span", { "class": "a-inline" }, "");
+    pub.disabled = t.stale;
+    pub.addEventListener("click", function () {
+      if (d.issues && !confirm("Claude が「意味がずれているかもしれない」とした所が " + d.issues + " か所あります。このまま公開しますか？")) return;
+      api("/api/creator/translation/publish", { form_id: t.form_id, lang: lang.id }).then(function (r) {
+        return loadTranslation().then(function () {
+          $("lang-msg").className = "a-inline ok";
+          $("lang-msg").textContent = r.name + " の画面を公開しました。患者さんのはじめの画面に、言語のボタンが出ます。";
+        });
+      }).catch(function (e) { msg.className = "a-inline ng"; msg.textContent = e.message; });
+    });
+    var table = el("table", { "class": "l-table" }, el("tr", {},
+      el("th", {}, ""), el("th", {}, "もとの日本語"), el("th", {}, "日本語に戻したもの（別の Claude）"), el("th", {}, lang.name)));
+    d.rows.forEach(function (r) {
+      // 訳を直す：Claude の直す案が入った入力欄が開く（そのままでも、打ち直してもよい）
+      var edit = el("button", { "class": "l-edit", type: "button" }, "直す");
+      edit.addEventListener("click", function () {
+        var text = prompt("「" + r.ja + "」の " + lang.name + " の訳を直します。", (r.issue && r.issue.suggestion) || r.tr);
+        if (text === null || !text.trim() || text.trim() === r.tr) return;
+        api("/api/creator/translation/fix", { form_id: t.form_id, lang: lang.id, row: r.row, text: text.trim() })
+          .then(renderTranslation).catch(function (e) { msg.className = "a-inline ng"; msg.textContent = e.message; });
+      });
+      var tr = el("tr", r.issue ? { "class": r.issue.severity } : (r.where === "設問" || r.where === "題名" ? { "class": "q" } : {}),
+        el("td", { "class": "w" }, r.where), el("td", {}, r.ja),
+        el("td", r.fixed ? { "class": "fixed" } : {}, r.fixed ? "（人が直した訳です）" : r.back),
+        el("td", { lang: lang.id }, r.tr, edit));
+      table.appendChild(tr);
+      if (r.issue) table.appendChild(el("tr", { "class": "note " + r.issue.severity }, el("td", {}, ""),
+        el("td", { colspan: "3" }, "【Claude の指摘】" + r.issue.message, r.issue.suggestion ? el("div", {}, "直す案：" + r.issue.suggestion) : null)));
+    });
+    box.appendChild(el("section", { "class": "l-lang" },
+      el("h3", {}, lang.name + (live ? "（公開中）" : "（まだ公開していません）")),
+      el("p", { "class": "a-summary" }, "比べた結果：" + (d.summary || "") + "　指摘 " + d.issues + " か所　／　" + d.usage.seconds + "秒　／　作った日時 " + t.draft.made_at.slice(5, 16)),
+      el("div", { "class": "a-actions" }, pub, msg),
+      el("details", { open: "open" }, el("summary", {}, "訳の一覧（" + d.rows.length + " 行）"), table)));
+  });
+}
+$("btn-translate").addEventListener("click", function () {
+  var m = $("lang-msg"), btn = $("btn-translate"), started = Date.now();
+  btn.disabled = true;
+  m.className = "a-inline";
+  var timer = setInterval(function () {
+    var sec = Math.round((Date.now() - started) / 1000);
+    m.textContent = (sec < 60 ? "Claude が訳しています…" : sec < 110 ? "別の Claude が、訳を日本語に戻しています…" : "もとの日本語と比べています…") + "（" + sec + "秒。2〜3分かかります）";
+  }, 500);
+  api("/api/creator/translate", { form_id: A.formId }).then(function (t) {
+    clearInterval(timer);
+    m.textContent = "訳ができました。下の表で、もとの日本語と、日本語に戻したものを見比べてください。";
+    renderTranslation(t);
+  }).catch(function (e) {
+    clearInterval(timer);
+    m.className = "a-inline ng";
+    m.textContent = e.message;
+    btn.disabled = false;
+  });
 });
 
 // ---------------------------------------------------------------- タブ
