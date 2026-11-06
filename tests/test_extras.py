@@ -7,7 +7,7 @@ import unittest
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 sys.path.insert(0, ROOT)
-from app import body, definitions, karte, lang, store, yamlmini  # noqa: E402
+from app import body, definitions, karte, lang, server, store, yamlmini  # noqa: E402
 from creator import translate  # noqa: E402
 
 DEF_YAML = """
@@ -180,6 +180,14 @@ class StoreExtrasTest(unittest.TestCase):
             self.assertIn("回答にかかった時間: 3分12秒", txt)
             self.assertIn("画面の言語: English", txt)
             self.assertIn("（画面の表示）EN:薬で具合が悪くなったことはありますか？", txt)
+
+
+class LanTest(unittest.TestCase):
+    def test_creator_is_only_for_this_pc(self):
+        self.assertTrue(server.is_local("127.0.0.1"))
+        self.assertTrue(server.is_local("::1"))
+        self.assertFalse(server.is_local("192.0.2.10"))          # タブレットなど、ほかの端末
+        self.assertTrue(all(not a.startswith("127.") for a in server.lan_addresses()))
 
 
 if __name__ == "__main__":

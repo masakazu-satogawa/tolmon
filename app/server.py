@@ -4,6 +4,7 @@ import json
 import mimetypes
 import os
 import re
+import socket
 import threading
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -25,6 +26,23 @@ CONTENT_TYPES = {
     ".svg": "image/svg+xml",
     ".png": "image/png",
 }
+
+
+LOCAL_ADDRESSES = ("127.0.0.1", "::1", "::ffff:127.0.0.1")
+
+
+def is_local(address):
+    """サーバーを動かしているPC自身からの接続か。"""
+    return address in LOCAL_ADDRESSES
+
+
+def lan_addresses():
+    """このPCの、ネットワーク上のアドレス（タブレットから開くときに使う）。"""
+    try:
+        found = socket.gethostbyname_ex(socket.gethostname())[2]
+    except OSError:
+        return []
+    return [a for a in found if not a.startswith("127.")]
 
 
 class App:
@@ -123,6 +141,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/admin" or path.startswith("/api/creator/"):
             if not app.creator:
                 return self._error(404, "このサーバーでは「作る画面」は使えません（設定の creator.enabled が false）")
+            if not is_local(self.client_address[0]):
+                # 作る画面は Claude の APIキーを使うので、ほかの端末からは開かせない
+                return self._error(403, "「作る画面」は、トルモンを動かしているPCからだけ開けます")
             if path == "/admin":
                 return self._static("admin.html")
             if path == "/api/creator/info":
@@ -185,6 +206,8 @@ class Handler(BaseHTTPRequestHandler):
         creating = path.startswith("/api/creator/")
         if creating and not app.creator:
             return self._error(404, "このサーバーでは「作る画面」は使えません")
+        if creating and not is_local(self.client_address[0]):
+            return self._error(403, "「作る画面」は、トルモンを動かしているPCからだけ開けます")
         try:
             # 帳票（PDF・画像）を受け取る作る画面だけ、大きなデータを許す
             body = self._read_json(MAX_PAPER if creating else MAX_BODY) if path != "/api/reload" else {}
@@ -275,7 +298,12 @@ def serve(root, config):
     print(f"  医師・看護師　: http://{shown}:{port}/karte?pcode=患者ID（電子カルテの【問診】から）")
     print(f"  問診一覧　　　: http://{shown}:{port}/doctor")
     if app.creator:
-        print(f"  作る画面　　　: http://{shown}:{port}/admin（Claude で白紙の問診票を読み取る。情報系PC用）")
+        print(f"  作る画面　　　: http://{shown}:{port}/admin（Claude で白紙の問診票を読み取る。このPCからだけ開ける）")
+    if host == "0.0.0.0":
+        print("  ── ほかの端末（タブレット）から開くとき ──")
+        for a in lan_addresses() or ["（このPCのアドレスが分かりませんでした。ipconfig で確かめてください）"]:
+            print(f"  　http://{a}:{port}/")
+        print("  　アドレスが2つ以上出たら、タブレットと同じWi-Fiのもの（多くは 192.168. で始まる）を使います")
     print(f"  問診票: {', '.join(d['title'] for d in app.defs.values()) or '（なし）'}")
     try:
         httpd.serve_forever()

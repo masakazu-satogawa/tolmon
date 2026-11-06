@@ -1,4 +1,8 @@
-"""トルモン起動用。  使い方:  python -X utf8 run.py"""
+"""トルモン起動用。
+
+  python -X utf8 run.py          このPCの中だけで使う（ふだんはこちら）
+  python -X utf8 run.py --lan    同じネットワークのタブレットからも開けるようにする（実機で試すとき）
+"""
 
 import os
 import sys
@@ -23,4 +27,8 @@ def load_config():
 
 
 if __name__ == "__main__":
-    serve(ROOT, load_config())
+    config = load_config()
+    if "--lan" in sys.argv[1:]:
+        # 設定ファイルは書きかえない。この起動のあいだだけ、ほかの端末からの接続を受ける
+        config.setdefault("server", {})["host"] = "0.0.0.0"
+    serve(ROOT, config)

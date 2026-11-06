@@ -63,6 +63,7 @@ Built with Claude: Japan 2026 提出プロジェクト。開発期間 2026/11/2 
 - 画面：素のHTML＋JavaScript（ビルド不要）。古い端末でも動くよう、ES5 寄りの書き方。
 - 相対パス・設定外部化。フォルダごとコピーで別PCへ移行できる。
 - 起動：`python -X utf8 run.py`（Windows は `start.bat`）。Python を変えたらサーバーを起動し直す。
+  タブレットの実機で試すときだけ `--lan`（`start_tablet.bat`）。作る画面と `/api/creator/` は、サーバーのPC自身からしか開けない。
 - Claude API：`creator/claude_api.py` が urllib で Messages API を呼ぶ。モデルは `claude-opus-5-5`、結果は JSON スキーマで受け取る。
 
 ### 定義ファイル（YAMLは「決めた書き方」だけ）
