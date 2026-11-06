@@ -31,6 +31,13 @@ window.__scan = async function () {
           over = Math.max(over, Math.round(nav.bottom - window.innerHeight));
           count++;
           worst = Math.max(worst, over);
+          // 押す所の中身（数字・選択肢の言葉）が、枠からはみ出していないか
+          var parts = document.querySelectorAll("#s-question .num-key, #s-question .choice, #s-question .btn, #s-question .body-tab");
+          var spill = 0;
+          for (var p = 0; p < parts.length; p++) {
+            if (parts[p].scrollHeight > parts[p].clientHeight + 1 || parts[p].scrollWidth > parts[p].clientWidth + 1) spill++;
+          }
+          if (spill) bad.push(form.id + "/" + langs[li] + "/" + sizes[s] + "/" + (k + 1) + "." + q.id + "：枠から中身がはみ出すボタン " + spill + "個");
           if (over > 0 || hover > 0) {
             bad.push(form.id + "/" + langs[li] + "/" + sizes[s] + "/" + (k + 1) + "." + q.id + "(" + q.type + "," + (q.options ? q.options.length : 0) + "):" + over + (hover > 0 ? " 横" + hover : ""));
           }
