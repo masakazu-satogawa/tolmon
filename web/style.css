@@ -190,7 +190,7 @@ body.has-topbar .screen.fit { height: calc(var(--vh) * 100 - var(--topbar) - 44p
 .screen.fit .q-body.is-body { flex: 1 1 0; min-height: 0; }
 .screen.fit .body-box { flex: 1 1 0; min-height: 150px; position: relative; }
 .screen.fit .body-svg { position: absolute; top: 6px; left: 6px; width: calc(100% - 12px); height: calc(100% - 12px); max-height: none; }
-.screen.fit .body-selected { max-height: 3.3em; overflow-y: auto; }
+.screen.fit .body-selected { max-height: 3.3em; overflow-y: auto; overflow-x: hidden; }
 .screen.fit .nav { padding-top: 0; }
 /* 横向き：図を左いっぱいに、設問・図の切り替え・「次へ」を右に並べる（横向きは高さが足りないので、上下に積まない） */
 @media (orientation: landscape) and (min-width: 700px) {
@@ -306,5 +306,16 @@ body.has-topbar .screen.fit { height: calc(var(--vh) * 100 - var(--topbar) - 44p
    「もどる・この内容で送る」は、いつも画面の下に出しておく */
 #s-review { height: calc(var(--vh) * 100 - 48px); min-height: 0; gap: 12px; }
 body.has-topbar #s-review { height: calc(var(--vh) * 100 - var(--topbar) - 44px); min-height: 0; }
-#s-review .review-list { flex: 1 1 0; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-right: 4px; }
+#s-review .review-list { flex: 1 1 0; min-height: 0; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; padding-right: 4px; overscroll-behavior: contain; }
 #s-review .nav { margin-top: 0; padding-top: 12px; border-top: 1px solid var(--line); }
+
+/* 患者さんの画面（タブレット）は、横には絶対に動かさない。
+   指で横にずらす・2本指で拡大する操作を受け付けない（拡大すると画面が右に寄ったままになる。文字は「小・中・大」で変える）。
+   html に fs-小中大 のクラスが付くのは患者さんの画面だけなので、それで見分ける */
+html[class*="fs-"], html[class*="fs-"] body {
+  overflow-x: hidden; overflow-x: clip; max-width: 100%; width: 100%;
+  overscroll-behavior-x: none; touch-action: pan-y;
+}
+html[class*="fs-"] #app { overflow-x: hidden; overflow-x: clip; }
+/* 入力欄の文字が 16px より小さいと、iPad・iPhone は入力のときに画面を勝手に拡大する */
+textarea, .q-input { font-size: 16px; font-size: max(1rem, 16px); }
