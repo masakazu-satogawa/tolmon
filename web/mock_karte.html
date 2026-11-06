@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>模擬カルテ（デモ用） | トルモン</title>
+<style>
+/* デモ用の模擬カルテ。実在の電子カルテの画面をまねたものではない（どの製品にも似せていない）。
+   「電子カルテの患者画面のボタンからトルモンを開き、コピーしてカルテに貼る」流れを見せるためだけの画面 */
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; font-family: "Yu Gothic UI", "Meiryo", "Hiragino Sans", sans-serif; font-size: 15px; color: #1f2a37; background: #e9edf2; }
+.m-top { background: #2f4a6b; color: #fff; display: flex; align-items: center; gap: 16px; padding: 8px 16px; }
+.m-top b { font-size: 1.05rem; }
+.m-demo { background: #ffd66b; color: #4a3500; border-radius: 4px; padding: 2px 10px; font-size: .8rem; font-weight: 700; }
+.m-patient { background: #fff; border-bottom: 1px solid #c5ced9; padding: 10px 16px; display: flex; gap: 22px; align-items: baseline; flex-wrap: wrap; }
+.m-patient .id { font-size: 1.25rem; font-weight: 700; letter-spacing: .04em; }
+.m-patient .name { font-size: 1.15rem; font-weight: 700; }
+.m-patient span.k { color: #5b6b7d; font-size: .85rem; margin-right: 4px; }
+.m-tools { background: #f6f8fb; border-bottom: 1px solid #c5ced9; padding: 8px 16px; display: flex; gap: 8px; }
+.m-tools button { border: 1px solid #9aa9bb; background: #fff; border-radius: 4px; padding: 7px 16px; font: inherit; cursor: pointer; }
+.m-tools button.monshin { background: #0f6b5c; border-color: #0f6b5c; color: #fff; font-weight: 700; }
+.m-tools button:disabled { color: #9aa9bb; cursor: default; }
+.m-body { display: grid; grid-template-columns: 170px 1fr; height: calc(100% - 128px); }
+.m-body.open { grid-template-columns: 170px 1fr 1.15fr; }
+.m-side { background: #f6f8fb; border-right: 1px solid #c5ced9; padding: 10px; overflow: auto; }
+.m-side h2, .m-note h2 { margin: 0 0 8px; font-size: .85rem; color: #5b6b7d; }
+.m-side li { list-style: none; padding: 6px 8px; border-radius: 4px; }
+.m-side ul { margin: 0; padding: 0; }
+.m-side li.now { background: #dbe7f5; font-weight: 700; }
+.m-note { padding: 12px 16px; overflow: auto; display: flex; flex-direction: column; gap: 10px; }
+.m-note label { display: grid; grid-template-columns: 34px 1fr; gap: 8px; align-items: start; }
+.m-note label b { display: grid; place-items: center; height: 30px; background: #2f4a6b; color: #fff; border-radius: 4px; }
+.m-note textarea { width: 100%; border: 1px solid #9aa9bb; border-radius: 4px; padding: 8px 10px; font: inherit; line-height: 1.6; resize: vertical; background: #fff; }
+.m-note textarea.s { min-height: 250px; }
+.m-note textarea.small { min-height: 54px; }
+.m-note textarea:focus { outline: 3px solid #7fb0e6; }
+.m-panel { border-left: 2px solid #0f6b5c; background: #fff; display: none; flex-direction: column; }
+.m-body.open .m-panel { display: flex; }
+.m-panel-head { background: #0f6b5c; color: #fff; padding: 6px 12px; display: flex; justify-content: space-between; align-items: center; font-weight: 700; }
+.m-panel-head button { border: 0; background: transparent; color: #fff; font: inherit; cursor: pointer; }
+.m-panel iframe { flex: 1; width: 100%; border: 0; }
+.m-foot { position: fixed; right: 12px; bottom: 8px; color: #5b6b7d; font-size: .75rem; }
+</style>
+</head>
+<body>
+<header class="m-top">
+  <b>模擬カルテ</b>
+  <span class="m-demo">デモ用の画面です。実在の電子カルテではありません。患者さんは架空です</span>
+</header>
+
+<div class="m-patient">
+  <span><span class="k">患者ID</span><span id="m-id" class="id"></span></span>
+  <span class="name">（架空）デモ 花子</span>
+  <span><span class="k">受診日</span><span id="m-day"></span></span>
+  <span><span class="k">診療科</span>内科</span>
+</div>
+
+<div class="m-tools">
+  <!-- 電子カルテの患者画面に置く想定のボタン。押すと、この患者さんの今日の問診（トルモン）が開く -->
+  <button id="btn-monshin" class="monshin" type="button">【問診】</button>
+  <button type="button" disabled>検査</button>
+  <button type="button" disabled>処方</button>
+  <button type="button" disabled>文書</button>
+</div>
+
+<div id="m-body" class="m-body">
+  <aside class="m-side">
+    <h2>受診の記録</h2>
+    <ul><li id="m-today" class="now"></li></ul>
+  </aside>
+
+  <section class="m-note">
+    <h2>診療録（ここに貼り付けます）</h2>
+    <label><b>S</b><textarea id="soap-s" class="s" placeholder="問診の文をここに貼り付ける（Ctrl＋V）"></textarea></label>
+    <label><b>O</b><textarea class="small"></textarea></label>
+    <label><b>A</b><textarea class="small"></textarea></label>
+    <label><b>P</b><textarea class="small"></textarea></label>
+  </section>
+
+  <section class="m-panel">
+    <div class="m-panel-head"><span>問診（トルモン）</span><button id="btn-close" type="button">閉じる ×</button></div>
+    <iframe id="m-frame" title="トルモンの医師・看護師の画面"></iframe>
+  </section>
+</div>
+
+<p class="m-foot">トルモンは、電子カルテのデータベースには書き込みません。医師・看護師が文をコピーして貼り付けます。</p>
+
+<script>
+"use strict";
+(function () {
+  var params = new URLSearchParams(location.search);
+  var pcode = (params.get("pcode") || "9000004").replace(/[^0-9A-Za-z]/g, "");
+  var d = new Date();
+  var day = d.getFullYear() + "/" + (d.getMonth() + 1) + "/" + d.getDate();
+  document.getElementById("m-id").textContent = pcode;
+  document.getElementById("m-day").textContent = day;
+  document.getElementById("m-today").textContent = day + "　初診";
+  document.getElementById("btn-monshin").addEventListener("click", function () {
+    // 本番では、電子カルテのボタンがブラウザで /karte?pcode=患者ID を開く。ここでは横に並べて見せる
+    document.getElementById("m-frame").src = "/karte?pcode=" + encodeURIComponent(pcode);
+    document.getElementById("m-body").className = "m-body open";
+  });
+  document.getElementById("btn-close").addEventListener("click", function () {
+    document.getElementById("m-body").className = "m-body";
+  });
+})();
+</script>
+</body>
+</html>

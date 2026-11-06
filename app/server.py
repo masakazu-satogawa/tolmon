@@ -150,6 +150,11 @@ class Handler(BaseHTTPRequestHandler):
 
         if path in PAGES:
             return self._static(PAGES[path])
+        if path == "/mock-karte":
+            # デモ用の模擬カルテ（電子カルテのボタンから開いて、貼り付ける流れを見せる）。本番（demo.enabled が false）では出さない
+            if not app.client_config["debug"]:
+                return self._error(404, "ページがありません")
+            return self._static("mock_karte.html")
         if path == "/admin" or path.startswith("/api/creator/"):
             if not app.creator:
                 return self._error(404, "このサーバーでは「作る画面」は使えません（設定の creator.enabled が false）")

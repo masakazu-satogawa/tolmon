@@ -121,6 +121,7 @@ flowchart LR
 ### 3. 医師・看護師の画面
 
 電子カルテの患者画面から開く想定です（`/karte?pcode=患者ID`）。その患者さんの当日の問診が、カルテに貼り付ける文で出ます。
+この流れを試せるように、デモ用の**模擬カルテ**（`/mock-karte`）を用意しました。【問診】を押すとトルモンが横に開き、コピーした文を貼り付けられます。実在の電子カルテではなく、どの製品の画面もまねていません。本番（`demo.enabled` が false）では出ません。
 
 ```
 【問診】整形・外科 初診問診票　2026/11/06 15:54
@@ -278,6 +279,7 @@ Windows では `start.bat` をダブルクリックしても起動します。�
 | 医師・看護師 | http://localhost:8080/karte?pcode=9000001 |
 | 問診の一覧 | http://localhost:8080/doctor |
 | 作る画面 | http://localhost:8080/admin |
+| 模擬カルテ（デモ用） | http://localhost:8080/mock-karte?pcode=9000004 |
 
 ### APIキーがなくても試せること
 
@@ -318,7 +320,7 @@ python -X utf8 -m unittest discover -s tests
 | `creator/` | 作る側。Claude API の呼び出し、読み取り、見直し、ダミー患者、翻訳、病院のルール |
 | `definitions/` | 確定した問診の定義（1ファイル＝1問診票）。`i18n/` に、人が確かめて公開した訳 |
 | `samples/` | 架空の患者さんの回答（デモ用）と、架空の見本の問診票（テスト用） |
-| `tools/` | 体の図を作る、デモ用の準備、画面写真を撮る（画面写真の道具だけ、Pillow と PyMuPDF があれば使います） |
+| `tools/` | 体の図を作る、デモ用の準備、画面写真を撮る、全設問が画面に収まるかを測る、デモ動画の下書きを作る（画面写真と動画の道具だけ、Pillow・PyMuPDF・OpenCV を使います） |
 | `tests/` | テスト |
 | `config.example.yaml` | 設定の見本 |
 | `PROGRESS.md` | 日ごとの開発ログ |

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>デモ動画用の説明図 | トルモン</title>
+<style>
+/* デモ動画の中で映す、説明用の2枚（仕組み／まとめ）。?slide=flow か ?slide=end で切り替える */
+* { box-sizing: border-box; }
+html { font-size: 23px; }
+html, body { margin: 0; height: 100%; font-family: "Yu Gothic UI", "Meiryo", "Hiragino Sans", sans-serif; color: #1d2422; background: #f6f7f5; }
+.slide { display: none; height: 100%; padding: 28px 44px; flex-direction: column; justify-content: center; gap: 20px; }
+.slide.on { display: flex; }
+h1 { margin: 0; font-size: 2.3rem; line-height: 1.4; }
+h1 em { font-style: normal; color: #0f6b5c; }
+.cols { display: grid; grid-template-columns: 1fr 70px 1fr; align-items: stretch; }
+.side { border-radius: 16px; padding: 18px 22px; background: #fff; border: 2px solid #d5dbd8; }
+.side.make { border-color: #c98a1a; }
+.side.use { border-color: #0f6b5c; }
+.side h2 { margin: 0 0 4px; font-size: 1.35rem; }
+.side .where { margin: 0 0 12px; color: #5a6662; font-size: .95rem; }
+.side ol { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.side li { background: #f6f7f5; border-radius: 10px; padding: 9px 14px; font-size: 1.1rem; font-weight: 700; }
+.side li small { display: block; font-weight: 400; color: #5a6662; font-size: .85rem; }
+.tag { display: inline-block; border-radius: 999px; padding: 2px 12px; font-size: .85rem; font-weight: 700; margin-left: 8px; vertical-align: 3px; }
+.tag.ai { background: #fdf1d8; color: #7a4b00; }
+.tag.noai { background: #e3f1ee; color: #0f6b5c; }
+.arrow { display: grid; place-items: center; font-size: 2.4rem; color: #5a6662; }
+.arrow small { display: block; font-size: .8rem; text-align: center; line-height: 1.3; }
+.center { text-align: center; align-items: center; }
+.big { font-size: 2.6rem; font-weight: 800; line-height: 1.5; margin: 0; }
+.motto { font-size: 2rem; font-weight: 800; color: #0f6b5c; margin: 14px 0 0; }
+.name { font-size: 1.5rem; font-weight: 700; margin: 26px 0 0; }
+.sub { color: #5a6662; font-size: 1.1rem; margin: 6px 0 0; }
+</style>
+</head>
+<body>
+
+<section id="s-flow" class="slide">
+  <h1>Claude を使うのは、<em>問診票を作るときだけ</em></h1>
+  <div class="cols">
+    <div class="side make">
+      <h2>作る側 <span class="tag ai">Claude を使う</span></h2>
+      <p class="where">情報システム担当の PC（インターネットあり）</p>
+      <ol>
+        <li>白紙の問診票を選ぶ<small>送るのは、白紙の紙だけ</small></li>
+        <li>Claude が読み取り、自分で見直す</li>
+        <li>人が紙と見比べて、確定する</li>
+      </ol>
+    </div>
+    <div class="arrow"><div>➜<small>設問の<br>ファイル</small></div></div>
+    <div class="side use">
+      <h2>使う側 <span class="tag noai">AI なし・インターネットなし</span></h2>
+      <p class="where">院内の問診サーバーとタブレット</p>
+      <ol>
+        <li>患者さんがタブレットで答える</li>
+        <li>回答は院内に保存<small>AI にも、病院の外にも出ない</small></li>
+        <li>医師・看護師がコピーして、カルテに貼る</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<section id="s-end" class="slide center">
+  <p class="big">現場を知る人が、<br>自分で道具を作れる。</p>
+  <p class="motto">読み取りはAI、確定は人、判断は医師。</p>
+  <p class="name">トルモン（撮るだけWeb問診）</p>
+  <p class="sub">Built with Claude: Japan 2026</p>
+</section>
+
+<script>
+"use strict";
+(function () {
+  var name = (/[?&]slide=([a-z]+)/.exec(location.search) || [])[1] || "flow";
+  var el = document.getElementById("s-" + name) || document.getElementById("s-flow");
+  el.className += " on";
+})();
+</script>
+</body>
+</html>
