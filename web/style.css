@@ -312,10 +312,6 @@ body.has-topbar #s-review { height: calc(var(--vh) * 100 - var(--topbar) - 44px)
 /* 患者さんの画面（タブレット）は、横には絶対に動かさない。
    指で横にずらす・2本指で拡大する操作を受け付けない（拡大すると画面が右に寄ったままになる。文字は「小・中・大」で変える）。
    html に fs-小中大 のクラスが付くのは患者さんの画面だけなので、それで見分ける */
-html[class*="fs-"], html[class*="fs-"] body {
-  overflow-x: hidden; overflow-x: clip; max-width: 100%; width: 100%;
-  overscroll-behavior-x: none; touch-action: pan-y;
-}
-html[class*="fs-"] #app { overflow-x: hidden; overflow-x: clip; }
+html[class*="fs-"], html[class*="fs-"] body { overflow-x: hidden; overscroll-behavior-x: none; touch-action: pan-y; }
 /* 入力欄の文字が 16px より小さいと、iPad・iPhone は入力のときに画面を勝手に拡大する */
 textarea, .q-input { font-size: 16px; font-size: max(1rem, 16px); }

@@ -117,8 +117,61 @@ function post(path, body) {
 }
 
 // ---------------------------------------------------------------- 画面の高さ（iPadのアドレスバーで100vhがずれる対策）
+// 画面の高さ・幅は「拡大していないときの大きさ」で測る。
+// window.innerHeight は、iPad で画面が拡大されていると小さくなり、収まっているのに「はみ出している」と数えてしまう
+function viewH() { return document.documentElement.clientHeight || window.innerHeight; }
+function viewW() { return document.documentElement.clientWidth || window.innerWidth; }
 function fitViewport() {
-  document.documentElement.style.setProperty("--vh", (window.innerHeight / 100) + "px");
+  document.documentElement.style.setProperty("--vh", (viewH() / 100) + "px");
+}
+
+// ---------------------------------------------------------------- 拡大させない（iPad・iPhone）
+// 2本の指が同時に触れると、画面が少し拡大されたままになり、右側が切れて見える。
+// 拡大の操作を受け付けず、もし拡大されていたら元の大きさ（等倍）に戻す。文字を大きくするのは「小・中・大」で。
+var VIEWPORT = "width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover";
+["gesturestart", "gesturechange", "gestureend"].forEach(function (name) {
+  document.addEventListener(name, function (ev) { ev.preventDefault(); });
+});
+document.addEventListener("touchmove", function (ev) {
+  if (ev.touches && ev.touches.length > 1) ev.preventDefault();      // 2本指で動かす操作（拡大・縮小）は受け付けない
+}, { passive: false });
+function fixZoom(force) {
+  var vv = window.visualViewport;
+  if (!force && vv && Math.abs(vv.scale - 1) < 0.01 && vv.offsetLeft < 1) return;
+  var meta = document.querySelector('meta[name="viewport"]');
+  if (!meta) return;
+  // 画面の設定を書きかえると、ブラウザが拡大率を決め直す（等倍に戻る）
+  meta.setAttribute("content", VIEWPORT + ", shrink-to-fit=no");
+  setTimeout(function () { meta.setAttribute("content", VIEWPORT); }, 60);
+  window.scrollTo(0, window.pageYOffset || 0);
+}
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", function () { fixZoom(false); });
+  window.visualViewport.addEventListener("scroll", function () { fixZoom(false); });
+}
+window.addEventListener("orientationchange", function () { setTimeout(function () { fixZoom(true); }, 300); });
+window.addEventListener("pageshow", function () { fixZoom(true); });
+
+// ---------------------------------------------------------------- 画面の状態を知らせる（実機の確認用。設定の demo.enabled が true のときだけ）
+// タブレットの画面の大きさ・拡大率・はみ出しを、トルモンのサーバーの data/debug.log に書く。患者さんの回答は送らない
+function report(tag) {
+  if (!S.cfg || !S.cfg.debug) return;
+  var d = document.documentElement, vv = window.visualViewport || {};
+  var nav = document.querySelector("#s-question .nav");
+  var navRect = nav && S.screen === "question" ? nav.getBoundingClientRect() : null;
+  var info = {
+    tag: tag, screen: S.screen, q: S.current, fs: d.className,
+    inner: window.innerWidth + "x" + window.innerHeight, client: d.clientWidth + "x" + d.clientHeight,
+    scroll: d.scrollWidth + "x" + d.scrollHeight, body: document.body.scrollWidth + "x" + document.body.scrollHeight,
+    vv: vv.width ? Math.round(vv.width) + "x" + Math.round(vv.height) + " scale=" + vv.scale + " left=" + Math.round(vv.offsetLeft) + " top=" + Math.round(vv.offsetTop) : "none",
+    page: Math.round(window.pageXOffset) + "," + Math.round(window.pageYOffset),
+    dev: window.screen.width + "x" + window.screen.height + " dpr=" + window.devicePixelRatio + " orient=" + window.orientation,
+    navBottom: navRect ? Math.round(navRect.bottom) : null,
+    cls: $("s-question").className + " | " + $("q-body").className
+  };
+  try {
+    fetch("/api/debug", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(info) }).catch(function () {});
+  } catch (e) { /* 知らせられなくても、問診は止めない */ }
 }
 window.addEventListener("resize", fitViewport);
 window.addEventListener("orientationchange", fitViewport);
@@ -152,6 +205,8 @@ function show(name) {
   document.body.className = patient ? "has-topbar" : "";
   S.screen = name;
   window.scrollTo(0, 0);
+  fixZoom(false);
+  setTimeout(function () { report("show"); }, 150);
 }
 function patientMode() { return PATIENT_SCREENS.indexOf(S.screen) >= 0; }
 
@@ -269,12 +324,12 @@ var FIT = {};   // 設問・言語・文字の大きさ・画面の大きさご�
 // はみ出している高さ（px）。0 以下なら収まっている
 function overflowBy() {
   var nav = document.querySelector("#s-question .nav").getBoundingClientRect();
-  return Math.max(document.documentElement.scrollHeight - window.innerHeight, nav.bottom - window.innerHeight);
+  return Math.max(document.documentElement.scrollHeight - viewH(), nav.bottom - viewH());
 }
 function fitQuestion(q) {
   var sec = $("s-question"), body = $("q-body");
   if (sec.hidden) return;
-  var key = [S.form.id, q.id, S.sub || "", L.code, document.documentElement.className, window.innerWidth, window.innerHeight].join("|");
+  var key = [S.form.id, q.id, S.sub || "", L.code, document.documentElement.className, viewW(), viewH()].join("|");
   if (FIT[key]) {
     sec.className = FIT[key].sec;
     body.className = FIT[key].body;
@@ -335,7 +390,7 @@ function refit() {
 var refitTimer = null;
 window.addEventListener("resize", function () {
   clearTimeout(refitTimer);
-  refitTimer = setTimeout(refit, 200);
+  refitTimer = setTimeout(function () { refit(); report("resize"); }, 200);
 });
 
 function renderQuestion() {

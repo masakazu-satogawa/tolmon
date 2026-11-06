@@ -72,6 +72,8 @@ class App:
             "idle_grace_seconds": patient.get("idle_grace_seconds", 20),
             "thanks_seconds": patient.get("thanks_seconds", 10),
             "pcode_pattern": self.pcode_re.pattern,
+            # 実機の確認用：タブレットの画面の状態（大きさ・拡大率）を data/debug.log に書く。本番（demo.enabled が false）では動かない
+            "debug": bool(config.get("demo", {}).get("enabled")),
         }
         self._lock = threading.Lock()
         store.init_db(self.data_dir)
@@ -287,6 +289,15 @@ class Handler(BaseHTTPRequestHandler):
             if not store.load_record(app.data_dir, record_id):
                 return self._error(404, "記録がありません")
             store.log_access(app.data_dir, "copy", record_id, self._client())
+            return self._json({"ok": True})
+        if path == "/api/debug":
+            # 実機の確認用。画面の大きさ・拡大率だけを受け取る（回答は受け取らない）
+            if not app.client_config["debug"]:
+                return self._error(404, "ページがありません")
+            line = {"at": datetime.now().isoformat(timespec="seconds"), **self._client(),
+                    **{str(k)[:20]: str(v)[:200] for k, v in list(body.items())[:20]}}
+            with open(os.path.join(app.data_dir, "debug.log"), "a", encoding="utf-8") as f:
+                f.write(json.dumps(line, ensure_ascii=False) + "\n")
             return self._json({"ok": True})
         if path == "/api/reload":
             defs, errors = app.reload()
