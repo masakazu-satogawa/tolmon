@@ -130,6 +130,7 @@ function setFontSize(size) {
   root.className = root.className.replace(/\bfs-[sml]\b/g, "").trim() + " fs-" + size;
   var btns = document.querySelectorAll("[data-fs]");
   for (var i = 0; i < btns.length; i++) btns[i].setAttribute("aria-pressed", String(btns[i].getAttribute("data-fs") === size));
+  refit();
 }
 (function () {
   var btns = document.querySelectorAll("[data-fs]");
@@ -185,6 +186,7 @@ function initReception() {
 
 function beginForm(form) {
   S.form = form;
+  S.current = null;
   S.answers = {};
   S.startedAt = localIso(new Date());
   S.startedMs = null;
@@ -255,9 +257,86 @@ $("btn-begin").addEventListener("click", function () {
 function goTo(qid) {
   S.current = qid;
   S.sub = null;
+  show("question");      // 先に画面を出す（1画面に収まるかを測るため）
   renderQuestion();
-  show("question");
 }
+
+// ---------------------------------------------------------------- 1画面に収める
+// 設問が画面の高さに収まらず「もどる・次へ」が隠れるとき、収まるまで段階的に詰める。
+//   すき間を詰める → 2列にする → 行を低くする → 見出しとボタンを少し小さく → 3列（4列）にする → いちばん詰める
+// 押す所の高さは、いちばん詰めても 44px より小さくしない。
+var FIT = {};   // 設問・言語・文字の大きさ・画面の大きさごとに、どう詰めたか（選ぶたびに並びが変わらないように覚える）
+// はみ出している高さ（px）。0 以下なら収まっている
+function overflowBy() {
+  var nav = document.querySelector("#s-question .nav").getBoundingClientRect();
+  return Math.max(document.documentElement.scrollHeight - window.innerHeight, nav.bottom - window.innerHeight);
+}
+function fitQuestion(q) {
+  var sec = $("s-question"), body = $("q-body");
+  if (sec.hidden) return;
+  var key = [S.form.id, q.id, S.sub || "", L.code, document.documentElement.className, window.innerWidth, window.innerHeight].join("|");
+  if (FIT[key]) {
+    sec.className = FIT[key].sec;
+    body.className = FIT[key].body;
+    return;
+  }
+  var choices = S.sub === "main" || q.type === "single" || q.type === "multi";
+  var longest = 0;
+  if (choices) {
+    var btns = body.querySelectorAll(".choice");
+    for (var b = 0; b < btns.length; b++) longest = Math.max(longest, width(btns[b].textContent) - 1);   // 先頭の ✓ の分を引く
+  }
+  function has(re) { return re.test(body.className); }
+  function columns(from, to) { body.className = body.className.replace(from, to); }
+  // 上から順に試す。true を返した段は「試してみて、良くならなければ元に戻す」
+  var steps = [
+    function () { sec.className += " k1"; },                                               // すき間を詰める
+    function () { if (choices && !has(/cols/)) body.className += " cols2"; },              // 2列にする
+    function () { if (choices && has(/cols2/) && !has(/dense/)) body.className += " dense"; },   // 行を低くする
+    function () { sec.className += " k2"; },                                               // 見出しとボタンを少し小さく
+    function () { if (choices && has(/cols2/) && longest <= 9) columns("cols2", "cols3"); },      // 言葉が短ければ3列
+    function () { sec.className += " k3"; },                                               // さらに詰める
+    function () { if (choices && has(/cols3/) && longest <= 6) columns("cols3", "cols4"); },
+    function () { sec.className += " k4"; },                                               // 選択肢の文字を少し小さく
+    function () { if (choices && has(/cols2/)) { columns("cols2", "cols3"); return true; } },
+    function () { if (choices && has(/cols3/) && longest <= 9) { columns("cols3", "cols4"); return true; } }
+  ];
+  // 記入欄（選ぶと出る欄）は、開いた状態で測る。あとで選んだときに、並びが変わったり「次へ」が隠れたりしないようにするため。
+  // まだ開いていなければ、同じ大きさの見えない記入欄を1つ、一時的に置いて測る。
+  // （いくつでも選べる設問で記入欄を2つ以上開いたときは、収まらなければスクロールになる）
+  var ghosts = [], i;
+  if (choices && S.sub !== "main") {
+    var withDetail = q.options.filter(function (o) { return o.detail; });
+    var need = Math.min(withDetail.length, 1) - body.querySelectorAll(".detail").length;
+    for (i = 0; i < need; i++) {
+      var ghost = el("div", { "class": "detail", style: "visibility:hidden" },
+        el("label", {}, oDetail(q, withDetail[i])), el("textarea", { rows: "2" }), el("p", { "class": "detail-note" }, T("detail_note")));
+      body.appendChild(ghost);
+      ghosts.push(ghost);
+    }
+  }
+  for (i = 0; i < steps.length && overflowBy() > 0.5; i++) {
+    var before = { over: overflowBy(), sec: sec.className, body: body.className };
+    if (steps[i]() && overflowBy() >= before.over) {
+      sec.className = before.sec;
+      body.className = before.body;
+    }
+  }
+  for (i = 0; i < ghosts.length; i++) body.removeChild(ghosts[i]);
+  FIT[key] = { sec: sec.className, body: body.className };
+}
+// 文字の大きさ・画面の向きが変わったら、表示中の設問を並べ直す
+function refit() {
+  if (!S.form || !S.current || S.screen !== "question" || !findQ(S.current)) return;
+  var a = document.activeElement;
+  if (a && (a.tagName === "TEXTAREA" || a.tagName === "INPUT")) return;   // 文字を打っている最中（キーボードが出ている）は動かさない
+  renderQuestion();
+}
+var refitTimer = null;
+window.addEventListener("resize", function () {
+  clearTimeout(refitTimer);
+  refitTimer = setTimeout(refit, 200);
+});
 
 function renderQuestion() {
   var qs = visibleQuestions();
@@ -279,8 +358,10 @@ function renderQuestion() {
   $("btn-back").textContent = S.fromReview ? T("to_review") : T("back");
 
   if (q.type === "body") {
-    if (S.sub === "main") renderBodyMain(q, a, body);
-    else renderBody(q, a, body);
+    if (S.sub === "main") {
+      renderBodyMain(q, a, body);
+      fitQuestion(q);
+    } else renderBody(q, a, body);
     return;
   }
   if (q.type === "single" || q.type === "multi") {
@@ -337,6 +418,7 @@ function renderQuestion() {
     body.appendChild(talk);
   }
   updateNext(q);
+  fitQuestion(q);
 }
 
 // ---------------------------------------------------------------- 数字（画面の大きな数字ボタン。端末のキーボードは出さない）

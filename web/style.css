@@ -253,3 +253,49 @@ body.has-topbar .screen.fit { height: calc(var(--vh) * 100 - var(--topbar) - 44p
 }
 .lang-switch button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .pre { white-space: pre-line; }
+
+/* 1画面に収まらないとき、patient.js の fitQuestion が段階的に詰める（k1 → k2 → k3 と、列の数）。
+   押す所の高さは、いちばん詰めても 44px より小さくしない */
+.q-body.cols4 { display: grid; gap: 8px; align-items: stretch; grid-template-columns: 1fr 1fr 1fr 1fr; }
+.q-body.cols4 .choice { min-height: 50px; padding: 6px 10px; gap: 8px; }
+.q-body.cols4 .choice .mark { width: 26px; height: 26px; border-width: 2px; font-size: .85rem; }
+.q-body.cols4 .detail { grid-column: 1 / -1; margin: 0; }
+.screen.k1 { gap: 10px; }
+.screen.k1 .q-body { gap: 8px; }
+.screen.k1 .nav { padding-top: 0; }
+.screen.k1 .progress-text { margin-top: -6px; }
+.screen.k2 .q-text { font-size: 1.25rem; }
+.screen.k2 .nav .btn { min-height: 60px; padding-top: 8px; padding-bottom: 8px; }
+.screen.k2 .q-body:not(.dense) .choice { min-height: 52px; padding-top: 6px; padding-bottom: 6px; }
+.screen.k2 .num-key { min-height: 46px; height: calc(var(--vh) * 6.5); }
+.screen.k2 .num-display { min-height: 2.6rem; }
+.screen.k2 textarea { min-height: 96px; }
+.screen.k3 .q-text { font-size: 1.1rem; }
+.screen.k3 .hint { font-size: .85rem; margin: 0; }
+.screen.k3 .nav .btn { min-height: 52px; padding-top: 4px; padding-bottom: 4px; }
+.screen.k3 .q-body .choice { min-height: 46px; padding-top: 4px; padding-bottom: 4px; }
+.screen.k3 .q-body.cols2, .screen.k3 .q-body.cols3, .screen.k3 .q-body.cols4 { gap: 6px; }
+.screen.k3 .num-key { min-height: 44px; height: calc(var(--vh) * 6); }
+.screen.k3 .num-value { font-size: 1.8rem; }
+/* k4：ここまで詰めても収まらないとき（選択肢がとても多い設問を「大」で見たとき など）。文字は「中」のふつうの大きさより小さくしない */
+.screen.k4 { gap: 6px; }
+.screen.k4 .q-text { font-size: 1rem; }
+.screen.k4 .q-body .choice { font-size: .85rem; line-height: 1.3; min-height: 44px; padding: 3px 10px; gap: 8px; }
+.screen.k4 .q-body .choice .mark { width: 24px; height: 24px; border-width: 2px; font-size: .8rem; }
+.screen.k4 .nav .btn { min-height: 48px; }
+.screen.k4 .q-body.cols2, .screen.k4 .q-body.cols3, .screen.k4 .q-body.cols4 { gap: 5px; }
+/* 記入欄（選ぶと出る欄）：詰めるときは、入力欄も低くする（2行分は残す） */
+.detail textarea { min-height: 96px; }
+.screen.k1 .detail { gap: 4px; margin-top: 0; margin-bottom: 0; }
+.screen.k2 .detail textarea { min-height: 84px; padding: 10px 14px; }
+.screen.k3 .detail textarea { min-height: 72px; padding: 8px 12px; }
+.screen.k3 .detail label, .screen.k3 .detail-note { font-size: .8rem; }
+.screen.k4 .detail textarea { min-height: 46px; padding: 6px 10px; }
+.screen.k4 .detail-note { display: none; }
+
+/* 確認の画面：答えの一覧は長くなるので、一覧の中だけをスクロールさせる。
+   「もどる・この内容で送る」は、いつも画面の下に出しておく */
+#s-review { height: calc(var(--vh) * 100 - 48px); min-height: 0; gap: 12px; }
+body.has-topbar #s-review { height: calc(var(--vh) * 100 - var(--topbar) - 44px); min-height: 0; }
+#s-review .review-list { flex: 1 1 0; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-right: 4px; }
+#s-review .nav { margin-top: 0; padding-top: 12px; border-top: 1px solid var(--line); }
