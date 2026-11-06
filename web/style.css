@@ -173,6 +173,35 @@ textarea:focus, .q-input:focus { outline: 3px solid var(--accent); border-color:
 .body-selected { margin: 0; font-weight: 700; }
 .body-selected.empty { color: var(--muted); font-weight: 400; }
 
+/* 体の図の設問は、どの文字の大きさでも、スクロールなしで1画面に収める（「もどる・次へ」がいつも見える）。
+   図の高さを決め打ちにせず、ほかの部品を置いた残りを、すべて図に使う */
+.screen.fit { height: calc(var(--vh) * 100 - 48px); min-height: 0; gap: 10px; }
+body.has-topbar .screen.fit { height: calc(var(--vh) * 100 - var(--topbar) - 44px); min-height: 0; }
+.screen.fit .progress-text { margin-top: -6px; }
+.screen.fit .q-body.is-body { flex: 1 1 0; min-height: 0; }
+.screen.fit .body-box { flex: 1 1 0; min-height: 150px; position: relative; }
+.screen.fit .body-svg { position: absolute; top: 6px; left: 6px; width: calc(100% - 12px); height: calc(100% - 12px); max-height: none; }
+.screen.fit .body-selected { max-height: 3.3em; overflow-y: auto; }
+.screen.fit .nav { padding-top: 0; }
+/* 横向き：図を左いっぱいに、設問・図の切り替え・「次へ」を右に並べる（横向きは高さが足りないので、上下に積まない） */
+@media (orientation: landscape) and (min-width: 700px) {
+  .screen.fit {
+    display: grid; column-gap: 20px; row-gap: 10px;
+    grid-template-columns: minmax(0, 9fr) minmax(0, 11fr);
+    grid-template-rows: auto auto auto auto auto minmax(0, 1fr) auto auto;
+  }
+  .screen.fit > .progress { grid-area: 1 / 1 / 2 / -1; }
+  .screen.fit > .progress-text { grid-area: 2 / 1 / 3 / -1; }
+  .screen.fit > .q-text { grid-area: 3 / 2; }
+  .screen.fit > .hint { grid-area: 4 / 2; }
+  .screen.fit > .q-body.is-body { display: contents; }
+  .screen.fit .body-tabs { grid-area: 5 / 2; }
+  .screen.fit .body-selected { grid-area: 6 / 2; align-self: start; max-height: 100%; }
+  .screen.fit > .warn { grid-area: 7 / 2; }
+  .screen.fit > .nav { grid-area: 8 / 2; margin-top: 0; }
+  .screen.fit .body-box { grid-area: 3 / 1 / 9 / 2; min-height: 0; }
+}
+
 .nav { margin-top: auto; display: flex; gap: 16px; padding-top: 12px; }
 .nav .btn { flex: 1; }
 .nav .btn.primary { flex: 2; }

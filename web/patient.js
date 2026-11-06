@@ -271,7 +271,10 @@ function renderQuestion() {
   $("q-msg").hidden = true;
   var body = $("q-body");
   clear(body);
-  body.className = "q-body" + (q.type === "body" && S.sub !== "main" ? " is-body" : "");
+  var figure = q.type === "body" && S.sub !== "main";
+  body.className = "q-body" + (figure ? " is-body" : "");
+  // 体の図の設問は、スクロールなしで1画面に収める（style.css の .screen.fit）
+  $("s-question").className = "screen" + (figure ? " fit" : "");
   var a = S.answers[q.id] || {};
   $("btn-back").textContent = S.fromReview ? T("to_review") : T("back");
 
