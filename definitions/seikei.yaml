@@ -214,6 +214,9 @@ questions:
       - label: "高校2年"
       - label: "高校3年"
       - label: "大学・専門学校"
+    show_if:
+      q: "age"
+      lt: 25
   - id: "club"
     type: "single"
     text: "部活は何をしていますか？"
@@ -235,5 +238,8 @@ questions:
       - label: "その他"
         detail: "部活の名前を教えてください"
     show_if:
-      q: "grade"
-      ne: "学生ではない"
+      all:
+        - q: "age"
+          lt: 25
+        - q: "grade"
+          ne: "学生ではない"
