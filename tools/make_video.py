@@ -285,7 +285,7 @@ def paper_image():
 
 # 途中の設問は、動画では飛ばす（全部で16問あるため）。飛ばした設問には、架空の答えを入れておく
 FILL = """(function(){
-  var set = {sex:'女性', myna_consent:'はい', temp_max_when:'わからない', symptoms:['痛い','腫れている'], onset:'1週間くらい前から',
+  var set = {sex:'男性', myna_consent:'はい', temp_max_when:'わからない', symptoms:['痛い','腫れている'], onset:'1週間くらい前から',
              cause:['転んだ'], past_illness:['高血圧'], current_treatment:'ない', drug_reaction:'ない'};
   Object.keys(set).forEach(function(id){ var qq=findQ(id); if(!qq) return;
     var ok = function(l){ return qq.options.some(function(o){return o.label===l}); };
@@ -385,6 +385,7 @@ def beats(d):
         (P, "送ると、受付番号だけが出ます。", 5.2, send),
         (P, "この間、AIは動いていません。", 3.2, None),
         (K, "医師は、電子カルテの患者画面で【問診】を押します。", 7.0, open_karte),
+        (K, "患者IDつきで開くだけで、カルテのデータベースには書き込みません。", 6.0, None),
         (K, "アレルギーや妊娠中といった、病院が決めた答えは、いちばん上に出ます。", 6.5, None),
         (K, "何語で答えても、文は日本語です。コピーして、カルテに貼り付けます。", 7.0, copy_paste),
         (K, "診断はしません。判断は医師がします。", 4.0, None),
