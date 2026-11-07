@@ -3,6 +3,7 @@
 import hashlib
 import json
 import os
+import re
 
 from . import body, lang, yamlmini
 
@@ -50,6 +51,8 @@ def validate(d):
     for k in ("id", "title", "questions"):
         if k not in d:
             errs.append(f"「{k}」がありません")
+    if "id" in d and not re.fullmatch(r"[a-z][a-z0-9_]{0,30}", str(d["id"])):
+        errs.append("「id」は半角の小文字・数字・_ で31文字までにしてください（ファイル名に使うため）")
     qs = d.get("questions") or []
     if not isinstance(qs, list) or not qs:
         errs.append("questions に設問が1つもありません")

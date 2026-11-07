@@ -14,6 +14,7 @@ from . import body, definitions, lang, store
 
 MAX_BODY = 1 * 1024 * 1024  # 回答の送信は1MBまで
 MAX_PAPER = 24 * 1024 * 1024  # 作る画面で受け取る帳票（base64）は24MBまで
+MAX_DEBUG_LOG = 5 * 1024 * 1024  # 実機確認用の記録（data/debug.log）は5MBまで
 
 # /karte は電子カルテの【問診】アイコンから患者IDつきで開く画面（中身は医師画面と同じ）
 PAGES = {"/": "index.html", "/doctor": "doctor.html", "/karte": "doctor.html", "/reception": "reception.html"}
@@ -97,6 +98,7 @@ class App:
 class Handler(BaseHTTPRequestHandler):
     app: App = None
     server_version = "Tolmon"
+    timeout = 30                                # 送信データが途中で止まったら、30秒で切る（スレッドが残らないように）
     sys_version = ""
 
     # ---- 共通
@@ -138,7 +140,13 @@ class Handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length") or 0)
         if length <= 0 or length > limit:
             raise ValueError("送信データの大きさが正しくありません")
-        return json.loads(self.rfile.read(length).decode("utf-8"))
+        try:
+            obj = json.loads(self.rfile.read(length).decode("utf-8"))
+        except RecursionError:                      # 入れ子が深すぎる JSON
+            raise ValueError("送信データの形が正しくありません")
+        if not isinstance(obj, dict):               # 本体は必ず {…}（配列や文字列は受け付けない）
+            raise ValueError("送信データの形が正しくありません")
+        return obj
 
     # ---- GET
     def do_GET(self):
@@ -268,7 +276,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._error(400, "問診票が見つかりません（受付でやり直してください）")
             if body.get("form_hash") and body["form_hash"] != d.get("_hash"):
                 return self._error(409, "問診票が更新されました。受付でやり直してください")
-            meta = {"started_at": body.get("started_at"), "seconds": body.get("seconds"), "lang": body.get("lang"),
+            def text(key, limit=40):            # 文字列だけ受け取る（型の違うものは無視）
+                v = body.get(key)
+                return v[:limit] if isinstance(v, str) else None
+            meta = {"started_at": text("started_at"), "seconds": body.get("seconds"), "lang": text("lang", 10),
                     "client": self._client()}
             try:
                 rec = store.save_pending(app.data_dir, d, body.get("answers"), meta)
@@ -300,10 +311,15 @@ class Handler(BaseHTTPRequestHandler):
                 return self._error(404, "ページがありません")
             line = {"at": datetime.now().isoformat(timespec="seconds"), **self._client(),
                     **{str(k)[:20]: str(v)[:200] for k, v in list(body.items())[:20]}}
-            with open(os.path.join(app.data_dir, "debug.log"), "a", encoding="utf-8") as f:
+            log_path = os.path.join(app.data_dir, "debug.log")
+            if os.path.exists(log_path) and os.path.getsize(log_path) > MAX_DEBUG_LOG:
+                return self._json({"ok": False, "error": "記録のファイルがいっぱいです"})
+            with open(log_path, "a", encoding="utf-8") as f:
                 f.write(json.dumps(line, ensure_ascii=False) + "\n")
             return self._json({"ok": True})
         if path == "/api/reload":
+            if not is_local(self.client_address[0]):
+                return self._error(403, "定義の読み込み直しは、トルモンを動かしているPCからだけできます")
             defs, errors = app.reload()
             return self._json({"ok": not errors, "forms": list(defs), "errors": errors})
         return self._error(404, "ページがありません")

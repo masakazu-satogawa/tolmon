@@ -190,5 +190,77 @@ class LanTest(unittest.TestCase):
         self.assertTrue(all(not a.startswith("127.") for a in server.lan_addresses()))
 
 
+class HardeningTest(unittest.TestCase):
+    """点検（11/7）で見つけた、おかしな入力への備え。"""
+
+    def test_yaml_too_deep_or_huge_number_is_yaml_error(self):
+        deep = "\n".join("  " * i + f"k{i}:" for i in range(3000)) + "\n" + "  " * 3000 + "v: 1\n"
+        with self.assertRaises(yamlmini.YamlError):
+            yamlmini.load(deep)
+        with self.assertRaises(yamlmini.YamlError):
+            yamlmini.load("n: " + "9" * 5000 + "\n")
+        self.assertEqual(yamlmini.load("a:\n  b:\n    c: 1\n"), {"a": {"b": {"c": 1}}})
+
+    def test_definition_id_must_be_safe_for_filenames(self):
+        d = make_def()
+        for bad in ("../x", "Seikei", "外科", "a" * 32):
+            d["id"] = bad
+            with self.assertRaises(definitions.DefinitionError):
+                definitions.validate(d)
+        d["id"] = "seikei_2"
+        definitions.validate(d)
+
+    def test_control_characters_are_dropped_from_free_text(self):
+        d = make_def()
+        with tempfile.TemporaryDirectory() as tmp:
+            store.init_db(tmp)
+            raw = {"allergy": {"value": "ある", "details": {"ある": "pen\x00ici\x1bllin\n2行目"}}}
+            rec = store.save_pending(tmp, d, raw, {})
+            got = store.load_record(tmp, rec["record_id"])
+            self.assertEqual(got["answers"]["allergy"]["details"]["ある"], "penicillin\n2行目")
+
+    def test_bad_json_bodies_get_400_not_a_dropped_connection(self):
+        import json
+        import socket
+        import threading
+        import urllib.error
+        import urllib.request
+        from http.server import ThreadingHTTPServer
+        with tempfile.TemporaryDirectory() as tmp:
+            os.makedirs(os.path.join(tmp, "definitions"))
+            os.makedirs(os.path.join(tmp, "web"))
+            with open(os.path.join(tmp, "definitions", "t.yaml"), "w", encoding="utf-8") as f:
+                f.write(DEF_YAML)
+            server.Handler.app = server.App(tmp, {"demo": {"enabled": True}})
+            httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
+            port = httpd.server_address[1]
+            threading.Thread(target=httpd.serve_forever, daemon=True).start()
+            try:
+                def post(path, data):
+                    req = urllib.request.Request(f"http://127.0.0.1:{port}{path}", data=data,
+                                                 headers={"Content-Type": "application/json"}, method="POST")
+                    try:
+                        with urllib.request.urlopen(req, timeout=5) as r:
+                            return r.status, json.loads(r.read())
+                    except urllib.error.HTTPError as e:
+                        return e.code, json.loads(e.read())
+                for body in (b"[1,2]", b'"str"', b"[" * 100000 + b"]" * 100000):
+                    status, res = post("/api/answers", body)
+                    self.assertEqual(status, 400, body[:10])
+                    self.assertFalse(res["ok"])
+                status, _ = post("/api/debug", b"[1]")
+                self.assertEqual(status, 400)
+                # 本体を途中までしか送らない接続は、timeout 秒で切られる（スレッドが永久に残らない）
+                self.assertEqual(server.Handler.timeout, 30)
+                s = socket.create_connection(("127.0.0.1", port), timeout=5)
+                s.sendall(b"POST /api/answers HTTP/1.1\r\nHost: x\r\nContent-Length: 100000\r\n\r\n{")
+                s.close()
+                status, res = post("/api/answers", json.dumps({"form_id": "t", "answers": {}}).encode())
+                self.assertEqual(status, 200, res)          # 途中で止めた接続のあとも、ふつうに受け付ける
+            finally:
+                httpd.shutdown()
+                httpd.server_close()
+
+
 if __name__ == "__main__":
     unittest.main()

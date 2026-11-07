@@ -21,6 +21,9 @@ def load_config():
     for name in ("config.yaml", "config.example.yaml"):
         path = os.path.join(ROOT, name)
         if os.path.exists(path):
+            if name != "config.yaml":
+                print("[注意] config.yaml がないので、見本の config.example.yaml で動かします"
+                      "（デモ用の画面が有効です。本番では config.yaml を作ってください）")
             with open(path, encoding="utf-8-sig") as f:
                 return yamlmini.load(f.read()) or {}
     return {}

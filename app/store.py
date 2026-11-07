@@ -16,6 +16,7 @@ from datetime import datetime
 from . import body, karte, lang
 
 _lock = threading.Lock()
+_CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")   # 改行（\n）・タブ・\r 以外の制御文字
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS records (
@@ -132,14 +133,15 @@ def clean_answers(defn, raw):
                 v = str(v)
             chosen = []
         else:  # text / time
-            v = str(v)[:2000] if v not in (None, "") else None
+            # 改行とタブ以外の制御文字は落とす（開示用 TXT やカルテ文の行をまぎらわせないため）
+            v = _CONTROL.sub("", str(v))[:2000] if v not in (None, "") else None
             chosen = []
             if v is None and t == "text" and a.get("talk") is True:
                 answers[q["id"]] = {"talk": True}       # 書くかわりに「診察のときに話します」を選んだ
                 continue
         if q.get("required") and (v in (None, "") or v == []):
             raise AnswerError(f"「{q['text']}」は必ず答えてください")
-        kept = {o: str(details[o])[:1000] for o in chosen if details.get(o)}
+        kept = {o: _CONTROL.sub("", str(details[o]))[:1000] for o in chosen if details.get(o)}
         if v not in (None, "") and v != []:
             answers[q["id"]] = {"value": v, "details": kept} if kept else {"value": v}
     return answers

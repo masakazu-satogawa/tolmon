@@ -249,7 +249,14 @@ def load(text):
         raise YamlError("1行目はインデントなしで始めてください", first[2])
     if len(lines) == 1 and _find_colon(first[1]) < 0 and not first[1].startswith("-"):
         return _scalar(first[1], first[2])
-    data = p.block(0)
+    try:
+        data = p.block(0)
+    except RecursionError:
+        raise YamlError("入れ子が深すぎます", first[2])
+    except ValueError as e:                     # 例：桁が多すぎる数字（Python の上限）
+        if isinstance(e, YamlError):
+            raise
+        raise YamlError(f"読めない値があります（{e}）", first[2])
     if p.peek() is not None:
         raise YamlError("インデントがそろっていません", p.peek()[2])
     return data
