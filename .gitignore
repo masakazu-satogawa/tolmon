@@ -2,8 +2,11 @@
 .env
 config.yaml
 
-# 実在帳票から作った定義（非公開）
+# 公開しない定義を置く場所（いまは使っていない。自院の4枚は了承のうえ definitions/ で公開）
 definitions_local/
+
+# Claude Code がこの PC 用に作る設定
+.claude/settings.local.json
 
 # 回答データ
 data/

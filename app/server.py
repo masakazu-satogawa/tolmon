@@ -70,7 +70,6 @@ class App:
         self.client_config = {
             "idle_seconds": patient.get("idle_seconds", 180),
             "idle_grace_seconds": patient.get("idle_grace_seconds", 20),
-            "thanks_seconds": patient.get("thanks_seconds", 10),
             "pcode_pattern": self.pcode_re.pattern,
             # 実機の確認用：タブレットの画面の状態（大きさ・拡大率）を data/debug.log に書く。本番（demo.enabled が false）では動かない
             "debug": bool(config.get("demo", {}).get("enabled")),

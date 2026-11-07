@@ -27,6 +27,9 @@ def load_config():
 
 
 if __name__ == "__main__":
+    if any(a in ("-h", "--help") for a in sys.argv[1:]):
+        print(__doc__)
+        sys.exit(0)
     config = load_config()
     if "--lan" in sys.argv[1:]:
         # 設定ファイルは書きかえない。この起動のあいだだけ、ほかの端末からの接続を受ける
