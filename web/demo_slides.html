@@ -32,9 +32,52 @@ h1 em { font-style: normal; color: #0f6b5c; }
 .motto { font-size: 2rem; font-weight: 800; color: #0f6b5c; margin: 14px 0 0; }
 .name { font-size: 1.5rem; font-weight: 700; margin: 26px 0 0; }
 .sub { color: #5a6662; font-size: 1.1rem; margin: 6px 0 0; }
+
+/* 題名カード：左に紙の問診票、右に名前と一言 */
+.slide.on.title { display: grid; grid-template-columns: 0.8fr 1.2fr; gap: 44px; align-items: center; }   /* .slide.on より強い指定にして、見せるときだけ横並び */
+.title .paper { background: #fff; border: 2px solid #d5dbd8; border-radius: 16px; padding: 14px; box-shadow: 0 8px 30px rgba(0,0,0,.08); justify-self: center; }
+.title .paper img { display: block; width: auto; max-width: 100%; height: auto; max-height: 68vh; margin: 0 auto; border-radius: 6px; }
+.title .paper .cap { text-align: center; color: #5a6662; font-size: .85rem; margin: 10px 0 0; }
+.title h1.app { font-size: 3.4rem; line-height: 1.15; margin: 0; }
+.title h1.app small { display: block; font-size: 1.3rem; color: #0f6b5c; font-weight: 700; margin-top: 8px; }
+.title .lead { font-size: 1.45rem; line-height: 1.6; margin: 26px 0 0; }
+.title .lead em { font-style: normal; background: linear-gradient(transparent 60%, #d9eee9 60%); }
+.title .who { margin: 34px 0 0; color: #1d2422; font-size: 1.05rem; line-height: 1.7; }
+.title .who b { display: block; font-size: 1.2rem; }
+.title .who span { color: #5a6662; }
+
+/* 結果カード：ここまでできていること */
+.done ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 14px 24px; }
+.done li { background: #fff; border: 2px solid #d5dbd8; border-radius: 14px; padding: 14px 18px 14px 56px; position: relative; font-size: 1.15rem; font-weight: 700; line-height: 1.5; }
+.done li small { display: block; font-weight: 400; color: #5a6662; font-size: .85rem; margin-top: 2px; }
+.done li::before { content: "✓"; position: absolute; left: 16px; top: 12px; width: 28px; height: 28px; border-radius: 50%; background: #0f6b5c; color: #fff; font-weight: 800; display: grid; place-items: center; font-size: 1rem; }
+.done li.wide { grid-column: 1 / -1; }
 </style>
 </head>
 <body>
+
+<section id="s-title" class="slide title">
+  <div class="paper">
+    <img id="t-paper" alt="紙の問診票（白紙）" src="">
+    <p class="cap">いま毎日使っている、紙の問診票</p>
+  </div>
+  <div>
+    <h1 class="app">トルモン<small>撮るだけ Web問診</small></h1>
+    <p class="lead">紙の問診票を読み取るだけで、<br><em>同じ設問の Web問診</em>に。<br>回答は、そのままカルテに貼れる文になります。</p>
+    <p class="who"><b>武蔵ヶ丘病院　情報システム担当　里川</b><span>Built with Claude: Japan 2026</span></p>
+  </div>
+</section>
+
+<section id="s-done" class="slide done">
+  <h1>ここまで、<em>できています</em></h1>
+  <ul>
+    <li>自院の紙の問診票 4枚を読み取り、公開<small>整形・外科／内科／耳鼻咽喉科／生活習慣病管理料</small></li>
+    <li>英語・繁体字中国語の画面<small>訳は Claude どうしで確かめ、人が読んで公開</small></li>
+    <li>iPad の実機で確認<small>第7世代・Safari。見つかった崩れは直した</small></li>
+    <li>Python の標準ライブラリだけで動く<small>テスト 49件。院内のサーバーにフォルダごとコピーで移せる</small></li>
+    <li class="wide">院内の閉域網で、電子カルテのボタンから開いて、コピーしてカルテに貼るところまで確認<small>電子カルテのテスト患者（架空）で。本物の患者さんの情報は使っていません</small></li>
+  </ul>
+</section>
 
 <section id="s-flow" class="slide">
   <h1>Claude を使うのは、<em>問診票を作るときだけ</em></h1>

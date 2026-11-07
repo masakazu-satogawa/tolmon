@@ -284,13 +284,21 @@ def in_frame(sel):
     return f"document.getElementById('m-frame').contentDocument.querySelector({json.dumps(sel)})"
 
 
-def paper_image():
-    """作る画面の左の紙。画面なしのブラウザは PDF を表示できないので、同じ紙を画像にしたものを出す。"""
+def paper_data():
     path = os.path.join(ROOT, "docs", "img", "paper.jpg")
     with open(path, "rb") as f:
-        data = base64.b64encode(f.read()).decode()
+        return "data:image/jpeg;base64," + base64.b64encode(f.read()).decode()
+
+
+def paper_image():
+    """作る画面の左の紙。画面なしのブラウザは PDF を表示できないので、同じ紙を画像にしたものを出す。"""
     return ("(function(){var box=document.getElementById('paper'); box.className='a-paper-box scroll';"
-            f"box.innerHTML='<img alt=\"もとの帳票\" src=\"data:image/jpeg;base64,{data}\">';}})()")
+            f"box.innerHTML='<img alt=\"もとの帳票\" src=\"{paper_data()}\">';}})()")
+
+
+def title_image():
+    """題名カードの左の紙。"""
+    return f"document.getElementById('t-paper').src = '{paper_data()}'"
 
 
 # 途中の設問は、動画では飛ばす（全部で16問あるため）。飛ばした設問には、架空の答えを入れておく
@@ -310,17 +318,26 @@ def beats(d):
     """(場面の名前, 話す言葉, 秒数, その間にする操作) の並び。秒数の合計が、動画の長さになる。"""
     A, P, K, S = "作る画面（情報システム担当）", "患者さんの画面（タブレット）", "医師・看護師（電子カルテから開く）", ""
 
+    def nav(f):
+        f.navigates = True                          # 画面を切り替える操作（字幕は切り替わってから）
+        return f
+
+    @nav
+    def title():
+        d.go("/static/demo_slides.html?slide=title", wait=0.2)
+        d.run(title_image())
+        d.r.hold(0.3)
+
+    @nav
     def open_admin():
         d.go(f"/admin?form={FORM}", wait=1.0)
         d.run(paper_image())
         d.scroll(top_of("#work"), 1.0)
 
-    def show_read():
+    def show_read_and_open():
         d.scroll("0", 1.0)
-        d.tap(q("#btn-read"), click=False, wait=1.6)
-
-    def open_draft():
-        d.tap(by_text("#draft-list button", "整形"), wait=0.8)
+        d.tap(q("#btn-read"), click=False, wait=1.4)
+        d.tap(by_text("#draft-list button", "整形"), wait=0.6)      # 今日は、読み取り済みのものを開く
         d.run(paper_image())
         d.scroll(top_of("#work"), 1.0)
 
@@ -333,10 +350,6 @@ def beats(d):
             d.tap(q(f'.a-tabs button[data-tab="{name}"]'), wait=0.8)
             if then:
                 d.scroll(top_of(then, -150), 1.4)
-        return f
-
-    def nav(f):
-        f.navigates = True                          # 画面を切り替える操作（字幕は切り替わってから）
         return f
 
     @nav
@@ -379,35 +392,34 @@ def beats(d):
               "t.value=document.getElementById('m-frame').contentDocument.querySelector('.d-karte').value;})()")
 
     return [
-        (A, "武蔵ヶ丘病院で情報システムを担当している、里川です。", 6.0, open_admin),
-        (A, "病院の受付と患者さんと医師が毎日使う、紙の問診票。", 5.5, None),
-        (A, "トルモンは、この紙を読み取るだけで、同じ設問のWeb問診に変えます。", 7.0, None),
-        (A, "紙のPDFを選んで「読み取る」を押すと、Claude が1分半ほどで設問を作ります。", 7.5, show_read),
-        (A, "今日は、読み取り済みのものを開きます。", 4.5, open_draft),
+        (S, "武蔵ヶ丘病院で情報システムを担当している、里川です。", 6.0, title),
+        (A, "病院の受付と患者さんと医師が毎日使う、紙の問診票。", 5.0, open_admin),
+        (A, "トルモンは、この紙を読み取るだけで、同じ設問のWeb問診に変えます。", 6.5, None),
+        (A, "紙のPDFを選んで「読み取る」を押すと、Claude が1分半ほどで設問を作ります。", 7.5, show_read_and_open),
         (A, "左が紙、右が Claude の作った設問です。", 4.5, None),
         (A, "紙では「書く欄」だった所は、選ぶ形に変わっています。", 5.5, show_added),
         (A, "入力の方式は人ごとに違い、患者さんごとに切り替えるのは大変だからです。", 7.0, None),
         (A, "点線は Claude が足した選択肢で、人が確かめます。", 5.5, None),
         (A, "Claude は自分の読み取りを、紙と突き合わせて見直します。", 6.0, tab("issues")),
         (A, "架空の患者さんを5人作って、最後まで通るかも確かめます。", 6.0, tab("dummy", "#dummy-list")),
-        (A, "英語と繁体字中国語の訳は、別の Claude が日本語に戻して、ずれを探します。", 7.0, tab("lang", ".l-table")),
-        (A, "公開を決めるのは、人です。", 3.0, None),
+        (A, "英語と繁体字中国語の訳は、別の Claude が日本語に戻して、ずれを探します。公開を決めるのは人です。", 8.0, tab("lang", ".l-table")),
         (P, "ここからは患者さんの画面です。受付が診療科を選んで、タブレットを渡します。", 7.5, reception),
         (P, "言葉も選べます。", 3.6, languages),
         (P, "数字は大きなボタンで。", 4.8, numbers),
         (P, "痛い所は、体の図を押すだけ。キーボードは出ません。", 6.0, figure),
         (P, "送ると、受付番号だけが出ます。", 5.2, send),
-        (P, "この間、AIは動いていません。", 3.2, None),
+        (P, "この間、AIは動いていません。", 3.0, None),
         (K, "医師は、電子カルテの患者画面で【問診】を押します。", 7.0, open_karte),
         (K, "患者IDつきで開くだけで、カルテのデータベースには書き込みません。", 6.0, None),
         (K, "アレルギーや妊娠中といった、病院が決めた答えは、いちばん上に出ます。", 6.5, None),
         (K, "何語で答えても、文は日本語です。コピーして、カルテに貼り付けます。", 7.0, copy_paste),
         (K, "診断はしません。判断は医師がします。", 4.0, None),
-        (S, "Claude を使うのは、問診票を作るときだけです。", 5.0, nav(lambda: d.go("/static/demo_slides.html?slide=flow", wait=0.3))),
-        (S, "患者さんの回答は、AIにも、病院の外にも出ません。", 5.0, None),
-        (S, "だから、インターネットにつながらない院内のネットワークで、そのまま使えます。", 7.0, None),
+        (S, "Claude を使うのは、問診票を作るときだけです。", 4.5, nav(lambda: d.go("/static/demo_slides.html?slide=flow", wait=0.3))),
+        (S, "患者さんの回答は、AIにも、病院の外にも出ません。", 4.5, None),
+        (S, "だから、インターネットにつながらない院内のネットワークで、そのまま使えます。", 6.0, None),
+        (S, "自院の問診票4枚、2つの外国語、iPad と院内の閉域網で、確かめました。", 7.5, nav(lambda: d.go("/static/demo_slides.html?slide=done", wait=0.3))),
         (S, "私の専門は、パソコンやネットワークの運用と保守です。開発は専門ではありません。", 7.5, nav(lambda: d.go("/static/demo_slides.html?slide=end", wait=0.3))),
-        (S, "それでも Claude Code と話しながら、ここまで作れました。", 5.5, None),
+        (S, "それでも Claude Code と話しながら、ここまで作れました。", 5.0, None),
         (S, "現場を知る人が、自分で道具を作れる。", 4.0, None),
         (S, "読み取りはAI、確定は人、判断は医師。トルモンです。", 5.5, None),
     ]
