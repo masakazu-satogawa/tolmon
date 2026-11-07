@@ -142,6 +142,7 @@ class Recorder:
         self.fonts = {}                              # 文字の大きさごとに作って使い回す
         self.small = ImageFont.truetype(font, 26)
         self.caption, self.label = "", ""
+        self.muted = True                           # 録画の前の用意のあいだは、何も書かない
         self.last = None
         self.started = time.time()
         self.frames = 0
@@ -184,6 +185,9 @@ class Recorder:
     def shoot(self):
         """いまの画面を1枚写し、動画の時間が実際の時間に追いつくまで、同じ絵を書く。"""
         import numpy as np
+        if self.muted:
+            time.sleep(0.05)
+            return
         try:
             data = base64.b64decode(self.b.call("Page.captureScreenshot", format="jpeg", quality=88)["data"])
             raw = self.cv2.imdecode(np.frombuffer(data, np.uint8), self.cv2.IMREAD_COLOR)
@@ -204,6 +208,9 @@ class Recorder:
             self.frames += 1
 
     def hold(self, seconds):
+        if self.muted:
+            time.sleep(seconds)                     # 録画の前の用意のあいだは、書かずに待つだけ
+            return
         end = self.now() + seconds
         while self.now() < end:
             self.shoot()
@@ -436,6 +443,11 @@ def main(argv):
         plan = beats(demo)
         total = sum(x[2] for x in plan)
         print(f"場面は {len(plan)} こ、長さは {int(total // 60)}分{total % 60:.0f}秒 の予定です")
+        # 最初の場面の画面は、録画が始まる前に用意しておく（開いている最中の画面が写らないように）
+        if plan[0][3]:
+            plan[0][3]()
+            plan[0] = plan[0][:3] + (None,)
+        rec.muted = False
         rec.started = time.time()
         clock, late = 0.0, 0.0
         for label, caption, seconds, action in plan:
