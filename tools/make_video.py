@@ -143,6 +143,7 @@ class Recorder:
         self.small = ImageFont.truetype(font, 26)
         self.caption, self.label = "", ""
         self.muted = True                           # 録画の前の用意のあいだは、何も書かない
+        self.pending = None                         # 画面が切り替わってから出す字幕
         self.last = None
         self.started = time.time()
         self.frames = 0
@@ -239,6 +240,9 @@ class Demo:
                     break
             except RuntimeError:
                 pass                                # 切り替えの途中
+        if self.r.pending:                          # 画面を切り替える場面の字幕は、新しい画面が出てから変える
+            self.r.label, self.r.caption = self.r.pending
+            self.r.pending = None
         self.r.hold(wait)
 
     def run(self, js):
@@ -323,9 +327,6 @@ def beats(d):
     def show_added():
         d.scroll(top_of("#q-list li.added, #q-list .q-added", -260), 1.6)
 
-    def show_figure():
-        d.scroll(top_of("#q-list .q-figs", -200), 1.6)
-
     def tab(name, then=None):
         def f():
             d.scroll(top_of(".a-tabs", -90), 0.8)
@@ -334,6 +335,11 @@ def beats(d):
                 d.scroll(top_of(then, -150), 1.4)
         return f
 
+    def nav(f):
+        f.navigates = True                          # 画面を切り替える操作（字幕は切り替わってから）
+        return f
+
+    @nav
     def reception():
         d.go("/", wait=2.2)
         d.tap(by_text("#form-list button", "整形"), wait=1.0)
@@ -343,10 +349,11 @@ def beats(d):
         d.tap(q('#lang-switch button[data-lang="ja"]'), wait=0.5)
 
     def numbers():
-        d.tap(q("#btn-begin"), wait=0.8)
+        d.tap(q("#btn-begin"), wait=0.6)
         for key in ("7", "2"):
-            d.tap(by_text(".num-key", key), wait=0.25)
-        d.tap(q("#btn-next"), wait=0.6)
+            d.tap(by_text(".num-key", key), wait=0.3)
+        d.r.hold(1.4)                               # 数字のボタンを見せてから次へ
+        d.tap(q("#btn-next"), wait=0.3)
 
     def figure():
         d.run(FILL)
@@ -359,6 +366,7 @@ def beats(d):
         d.r.hold(1.6)
         d.tap(q("#btn-submit"), wait=1.5)
 
+    @nav
     def open_karte():
         d.go(f"/mock-karte?pcode={KARTE_PCODE}", wait=2.6)
         d.tap(q("#btn-monshin"), wait=2.0)
@@ -379,14 +387,14 @@ def beats(d):
         (A, "左が紙、右が Claude の作った設問です。", 4.5, None),
         (A, "紙では「書く欄」だった所は、選ぶ形に変わっています。", 5.5, show_added),
         (A, "入力の方式は人ごとに違い、患者さんごとに切り替えるのは大変だからです。", 7.0, None),
-        (A, "点線は Claude が足した選択肢で、人が確かめます。", 5.5, show_figure),
+        (A, "点線は Claude が足した選択肢で、人が確かめます。", 5.5, None),
         (A, "Claude は自分の読み取りを、紙と突き合わせて見直します。", 6.0, tab("issues")),
         (A, "架空の患者さんを5人作って、最後まで通るかも確かめます。", 6.0, tab("dummy", "#dummy-list")),
         (A, "英語と繁体字中国語の訳は、別の Claude が日本語に戻して、ずれを探します。", 7.0, tab("lang", ".l-table")),
         (A, "公開を決めるのは、人です。", 3.0, None),
         (P, "ここからは患者さんの画面です。受付が診療科を選んで、タブレットを渡します。", 7.5, reception),
         (P, "言葉も選べます。", 3.6, languages),
-        (P, "数字は大きなボタンで。", 4.2, numbers),
+        (P, "数字は大きなボタンで。", 4.8, numbers),
         (P, "痛い所は、体の図を押すだけ。キーボードは出ません。", 6.0, figure),
         (P, "送ると、受付番号だけが出ます。", 5.2, send),
         (P, "この間、AIは動いていません。", 3.2, None),
@@ -395,10 +403,10 @@ def beats(d):
         (K, "アレルギーや妊娠中といった、病院が決めた答えは、いちばん上に出ます。", 6.5, None),
         (K, "何語で答えても、文は日本語です。コピーして、カルテに貼り付けます。", 7.0, copy_paste),
         (K, "診断はしません。判断は医師がします。", 4.0, None),
-        (S, "Claude を使うのは、問診票を作るときだけです。", 5.0, lambda: d.go("/static/demo_slides.html?slide=flow", wait=0.3)),
+        (S, "Claude を使うのは、問診票を作るときだけです。", 5.0, nav(lambda: d.go("/static/demo_slides.html?slide=flow", wait=0.3))),
         (S, "患者さんの回答は、AIにも、病院の外にも出ません。", 5.0, None),
         (S, "だから、インターネットにつながらない院内のネットワークで、そのまま使えます。", 7.0, None),
-        (S, "私の専門は、パソコンやネットワークの運用と保守です。開発は専門ではありません。", 7.5, lambda: d.go("/static/demo_slides.html?slide=end", wait=0.3)),
+        (S, "私の専門は、パソコンやネットワークの運用と保守です。開発は専門ではありません。", 7.5, nav(lambda: d.go("/static/demo_slides.html?slide=end", wait=0.3))),
         (S, "それでも Claude Code と話しながら、ここまで作れました。", 5.5, None),
         (S, "現場を知る人が、自分で道具を作れる。", 4.0, None),
         (S, "読み取りはAI、確定は人、判断は医師。トルモンです。", 5.5, None),
@@ -451,9 +459,15 @@ def main(argv):
         rec.started = time.time()
         clock, late = 0.0, 0.0
         for label, caption, seconds, action in plan:
-            rec.label, rec.caption = label, caption
+            if getattr(action, "navigates", False):
+                rec.pending = (label, caption)      # 新しい画面が出てから字幕を変える（Demo.go の中で）
+            else:
+                rec.label, rec.caption = label, caption
             if action:
                 action()
+            if rec.pending:
+                rec.label, rec.caption = rec.pending
+                rec.pending = None
             clock += seconds
             late = max(late, rec.now() - clock)
             rec.until(clock)
