@@ -22,8 +22,9 @@ import urllib.request
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BASE = "http://localhost:8080"
 PORT = 9333
-SIZE = (1280, 720)              # ブラウザの画面の大きさ
-BAND = 110                      # その下に足す、字幕の帯の高さ（画面のボタンに字幕が重ならないように、画面の外に出す）
+SIZE = (1920, 930)              # ブラウザの画面の大きさ（帯と合わせて 1920×1080。提出の案内が 1080p 以上のため）
+BAND = 150                      # その下に足す、字幕の帯の高さ（画面のボタンに字幕が重ならないように、画面の外に出す）
+SCALE = 1.5                     # 画面は 1280×620 で描いて、1.5倍の精細さで写す（文字が小さくならないように）
 FPS = 10
 EDGE = [r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
         r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"]
@@ -137,8 +138,9 @@ class Recorder:
         self.cv2, self.b = cv2, browser
         self.writer = cv2.VideoWriter(path, cv2.VideoWriter_fourcc(*"mp4v"), FPS, (SIZE[0], SIZE[1] + BAND))
         font = next(f for f in FONTS if os.path.exists(f))
-        self.font = ImageFont.truetype(font, 28)
-        self.small = ImageFont.truetype(font, 18)
+        self.font_path = font
+        self.fonts = {}                              # 文字の大きさごとに作って使い回す
+        self.small = ImageFont.truetype(font, 26)
         self.caption, self.label = "", ""
         self.last = None
         self.started = time.time()
@@ -147,21 +149,19 @@ class Recorder:
     def now(self):
         return time.time() - self.started
 
-    def _wrap(self, text, width=38):
-        lines, line = [], ""
-        for ch in text:
-            line += ch
-            if len(line) >= width and ch not in "「（":
-                lines.append(line)
-                line = ""
-        if line:
-            lines.append(line)
-        # 行のはじめに句読点が来ないよう、前の行に送る
-        for i in range(1, len(lines)):
-            while lines[i] and lines[i][0] in "、。」）":
-                lines[i - 1] += lines[i][0]
-                lines[i] = lines[i][1:]
-        return [x for x in lines if x][:2]
+    def _font(self, size):
+        from PIL import ImageFont
+        if size not in self.fonts:
+            self.fonts[size] = ImageFont.truetype(self.font_path, size)
+        return self.fonts[size]
+
+    def _fit(self, d, text, max_width):
+        """字幕は必ず1行。入らないときだけ、文字を少し小さくする（途中で折り返すと読みにくいため）。"""
+        for size in range(44, 29, -2):
+            f = self._font(size)
+            if d.textlength(text, font=f) <= max_width:
+                return f
+        return self._font(30)
 
     def _draw(self, frame):
         import numpy as np
@@ -172,14 +172,13 @@ class Recorder:
         d = ImageDraw.Draw(out)
         if self.label:                              # いまどの画面か（帯の左上）
             tw = d.textlength(self.label, font=self.small)
-            d.rounded_rectangle([14, h + 8, 14 + tw + 28, h + 38], radius=15, fill=(15, 107, 92))
-            d.text((28, h + 11), self.label, font=self.small, fill=(255, 255, 255))
-        if self.caption:                            # 話す言葉（帯のまん中。2行まで）
-            lines = self._wrap(self.caption)
-            top = h + (46 if len(lines) == 1 else 34) + (0 if self.label else -8)
-            for i, line in enumerate(lines):
-                tw = d.textlength(line, font=self.font)
-                d.text(((w - tw) / 2, top + 36 * i), line, font=self.font, fill=(255, 255, 255))
+            d.rounded_rectangle([20, h + 10, 20 + tw + 36, h + 50], radius=20, fill=(15, 107, 92))
+            d.text((38, h + 15), self.label, font=self.small, fill=(255, 255, 255))
+        if self.caption:                            # 話す言葉（帯のまん中。必ず1行）
+            f = self._fit(d, self.caption, w - 120)
+            tw = d.textlength(self.caption, font=f)
+            top = h + 60 + (44 - f.size) / 2
+            d.text(((w - tw) / 2, top), self.caption, font=f, fill=(255, 255, 255))
         return self.cv2.cvtColor(np.asarray(out), self.cv2.COLOR_RGB2BGR)
 
     def shoot(self):
@@ -424,7 +423,9 @@ def main(argv):
             return 1
         b = Browser(target["webSocketDebuggerUrl"])
         b.call("Page.enable")
-        b.call("Emulation.setDeviceMetricsOverride", width=SIZE[0], height=SIZE[1], deviceScaleFactor=1, mobile=False)
+        # 画面は 1280×620 の大きさで描き（タブレットに近い見た目）、1.5倍の精細さで写して 1920×930 にする
+        b.call("Emulation.setDeviceMetricsOverride", width=SIZE[0] * 2 // 3, height=SIZE[1] * 2 // 3,
+               deviceScaleFactor=SCALE, mobile=False)
         b.call("Page.addScriptToEvaluateOnNewDocument", source=HELPERS)
         try:
             b.call("Browser.grantPermissions", permissions=["clipboardReadWrite", "clipboardSanitizedWrite"], origin=BASE)
