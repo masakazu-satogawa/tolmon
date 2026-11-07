@@ -296,11 +296,6 @@ def paper_image():
             f"box.innerHTML='<img alt=\"もとの帳票\" src=\"{paper_data()}\">';}})()")
 
 
-def title_image():
-    """題名カードの左の紙。"""
-    return f"document.getElementById('t-paper').src = '{paper_data()}'"
-
-
 # 途中の設問は、動画では飛ばす（全部で16問あるため）。飛ばした設問には、架空の答えを入れておく
 FILL = """(function(){
   var set = {sex:'男性', myna_consent:'はい', temp_max_when:'わからない', symptoms:['痛い','腫れている'], onset:'1週間くらい前から',
@@ -322,17 +317,28 @@ def beats(d):
         f.navigates = True                          # 画面を切り替える操作（字幕は切り替わってから）
         return f
 
-    @nav
-    def title():
-        d.go("/static/demo_slides.html?slide=title", wait=0.2)
-        d.run(title_image())
-        d.r.hold(0.3)
-
-    @nav
     def open_admin():
         d.go(f"/admin?form={FORM}", wait=1.0)
         d.run(paper_image())
         d.scroll(top_of("#work"), 1.0)
+
+    def title():
+        """作る画面を先に用意して、その上に題名カードをかぶせる（外すと、読み込み中の画面を見せずに切り替わる）。"""
+        open_admin()
+        d.run("(function(){var f=document.createElement('iframe'); f.id='title-ov';"
+              " f.style.cssText='position:fixed;inset:0;width:100%;height:100%;border:0;z-index:99999;background:#f6f7f5';"
+              " f.src='/static/demo_slides.html?slide=title'; document.body.appendChild(f);})()")
+        for _ in range(50):
+            ok = d.run("(function(){var f=document.getElementById('title-ov'); var w=f&&f.contentDocument;"
+                       " return !!(w && w.readyState==='complete' && w.getElementById('t-paper'));})()")
+            if ok:
+                break
+            time.sleep(0.1)
+        d.run("document.getElementById('title-ov').contentDocument.getElementById('t-paper').src = '" + paper_data() + "'")
+        d.r.hold(0.5)
+
+    def drop_title():
+        d.run("(function(){var f=document.getElementById('title-ov'); if(f) f.remove();})()")
 
     def show_read_and_open():
         d.scroll("0", 1.0)
@@ -393,7 +399,7 @@ def beats(d):
 
     return [
         (S, "武蔵ヶ丘病院で情報システムを担当している、里川です。", 6.0, title),
-        (A, "病院の受付と患者さんと医師が毎日使う、紙の問診票。", 5.0, open_admin),
+        (A, "病院の受付と患者さんと医師が毎日使う、紙の問診票。", 5.0, drop_title),
         (A, "トルモンは、この紙を読み取るだけで、同じ設問のWeb問診に変えます。", 6.5, None),
         (A, "紙のPDFを選んで「読み取る」を押すと、Claude が1分半ほどで設問を作ります。", 7.5, show_read_and_open),
         (A, "左が紙、右が Claude の作った設問です。", 4.5, None),
