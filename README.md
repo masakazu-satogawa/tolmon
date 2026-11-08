@@ -9,6 +9,8 @@ AI（Claude）を使うのは、問診票を**作るときだけ**です。患�
 
 Built with Claude: Japan 2026 提出作品（開発期間：2026年11月2日〜8日）
 
+**デモ動画（2分56秒）**：https://youtu.be/CCKmDozWemg
+
 | 紙の問診票 | Claude が作った設問（人が確かめる） |
 |---|---|
 | <img src="docs/img/paper.jpg" width="380" alt="紙の問診票"> | <img src="docs/img/admin_questions.png" width="380" alt="作る画面の設問一覧"> |
